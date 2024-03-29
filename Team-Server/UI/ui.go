@@ -7,15 +7,7 @@ import (
 	"time"
 )
 
-/*
 
-UI/ui.go:78:5: undefined: logBuffer
-UI/ui.go:83:2: undefined: win
-UI/ui.go:83:21: undefined: ScreenWidth
-UI/ui.go:83:34: undefined: ScreenHeight
-UI/ui.go:84:5: undefined: win
-
-*/
 var logBuffer *gtk.TextBuffer
 var mRefProvider *gtk.CssProvider
 var screen *gdk.Screen

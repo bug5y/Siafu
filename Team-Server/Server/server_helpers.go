@@ -5,21 +5,23 @@ import (
 	"strconv"
 	"fmt"
 	"net"
+	"Team-Server/DB"
 )
 var serverIP string
+
 func updateConnections() []string {
     // New connections are added to connectionlog in addToDB()
     serverresp = nil
     // If changes were made get the changes
-    if len(newConnections) != prevLength {
+    if len(DB.NewConnections) != prevLength {
         // If changes were made, format the log
         var formattedLog string
-        for _, conn := range newConnections {
+        for _, conn := range DB.NewConnections {
             formattedLog += fmt.Sprintf("Time: %s, Host Version: %s, ID: %d\n", conn.Time, conn.HostVersion, conn.ID)
         }
         // Append the formatted log to serverresp
         serverresp = append(serverresp, formattedLog)
-        prevLength = len(newConnections)
+        prevLength = len(DB.NewConnections)
         return serverresp
     }
     return serverresp // No changes
@@ -36,7 +38,7 @@ func getVersionNamesAndUIDs() ([]string, []string, []string, error) {
     }
 
     // Open a connection to the database
-    db, err := sql.Open("sqlite3", dbPath)
+    db, err := sql.Open("sqlite3", DB.DbPath)
     if err != nil {
         return nil, nil, nil, fmt.Errorf("failed to open database connection: %s", err)
     }
@@ -98,7 +100,7 @@ func addToCommandQueue(commands [][]string, idMask int) {
 }
 
 func handleUID(uid string) {
-	randUID, versionstr := parseUID(uid)
+	randUID, versionstr := DB.ParseUID(uid)
 	if randUID == "" || versionstr == "" {
 		fmt.Println("Invalid UID format")
 		return
@@ -115,7 +117,7 @@ func handleUID(uid string) {
 
     versionName := getVersionString(hexString)
 
-    IDMask, err := isUIDInDB(uid, versionName)
+    IDMask, err := DB.IsUIDInDB(uid, versionName)
 	if err != nil {
 		fmt.Println("Error checking UID:", err)
 		return

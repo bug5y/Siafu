@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+# gcc
+# c++17
+# "intelliSenseMode": "windows-gcc-x64"
+# "C:\\msys64\\ucrt64\\bin\\gcc.exe"
+
+
 import sys
 import os
 

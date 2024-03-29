@@ -53,19 +53,3 @@ func HandleAlerts(output string, buffer *gtk.TextBuffer, warn bool){ // Inserts 
     iter := buffer.GetEndIter()
     buffer.InsertMarkup(iter, output)
 }
-
-
-/*
-UI/ui.go:15:2: "Operator/Client" imported and not used
-UI/ui.go:776:9: undefined: routeCMD -
-UI/ui.go:782:8: undefined: implant_cmd
-UI/ui.go:796:8: undefined: servercommand
-UI/ui.go:802:53: undefined: serverIP
-UI/ui.go:803:9: undefined: insertLogText
-UI/ui.go:806:9: undefined: insertLogMarkup
-UI/ui.go:813:12: undefined: exec
-UI/ui_helpers.go:6:2: "log" imported and not used
-UI/ui_helpers.go:7:5: "github.com/fstanis/screenresolution" imported and not used
-UI/ui_helpers.go:7:5: too many errors
-
-*/

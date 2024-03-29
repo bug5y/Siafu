@@ -2,6 +2,7 @@ package Client
 
 import (
 	"Operator/Common"
+	"sync"
 	"fmt"
 	"encoding/json"
 	"io/ioutil"
@@ -28,6 +29,8 @@ var response string
 
 var port string
 var defaultPort = "8443"
+
+var routeMutex sync.Mutex 
 
 func InitConnection() { // Add mutex so this can be used to check connections continuosly
     if Common.ServerURL == "" {
@@ -57,7 +60,7 @@ func UpdateLog() {
 		cmdString := ""
 		responseChan := make(chan string)
 		go func() {
-			ServercCommand(cmdGroup, cmdString, responseChan)
+			ServerCommand(cmdGroup, cmdString, responseChan)
 		}()
 		// Wait for the response or timeout
 		select {
@@ -76,6 +79,8 @@ func UpdateLog() {
 
 
 func RouteCMD(input string, responseChan chan<- string, buffer *gtk.TextBuffer, entry *gtk.Entry) {
+    routeMutex.Lock()
+    defer routeMutex.Unlock()
 	// Trim spaces and newline characters from the input
 	input = strings.TrimSpace(input)
 	
@@ -112,7 +117,7 @@ func RouteCMD(input string, responseChan chan<- string, buffer *gtk.TextBuffer, 
 	cmdString := strings.Join(parts[1:], " ")
 
 	if Common.ImplantCmd {
-		err := sendCommand(cmdGroup, cmdString, responseChan, Common.CurrentBuffer, Common.CurrentID)
+		err := ImplantCommand(cmdGroup, cmdString, responseChan, Common.CurrentBuffer, Common.CurrentID)
 		if err != nil {
 			output := fmt.Sprintf("Error sending command: %v\n", err)
 			warn := true
@@ -123,7 +128,7 @@ func RouteCMD(input string, responseChan chan<- string, buffer *gtk.TextBuffer, 
 	
 	if Common.ServerCmd {
 		
-		err := ServercCommand(cmdGroup, cmdString, responseChan)
+		err := ServerCommand(cmdGroup, cmdString, responseChan)
 		if err != nil {
 			output := fmt.Sprintf("Error sending command: %v\n", err)
 			warn := true
@@ -133,7 +138,8 @@ func RouteCMD(input string, responseChan chan<- string, buffer *gtk.TextBuffer, 
 	}
 }
 
-func sendCommand(cmdGroup, cmdString string, responseChan chan<- string, buffer *gtk.TextBuffer, implantID string) error {
+func ImplantCommand(cmdGroup, cmdString string, responseChan chan<- string, buffer *gtk.TextBuffer, implantID string) error {
+
 	endpoint := "/operator"
 	server := Common.ServerURL + endpoint
 	client := &http.Client{}
@@ -232,7 +238,8 @@ func sendCommand(cmdGroup, cmdString string, responseChan chan<- string, buffer 
 }
 
 
-func ServercCommand(cmdGroup, cmdString string, responseChan chan<- string) error {
+func ServerCommand(cmdGroup, cmdString string, responseChan chan<- string) error {
+
 	endpoint := "/info"
 	server := Common.ServerURL + endpoint
 	client := &http.Client{}

@@ -2,13 +2,17 @@ package Server
 
 import (
 	"strings"
+    "sync"
 	"fmt"
 	"log"
 	"net/http"
 	"Team-Server/UI"
 )
 
-var newConnections []ConnectionLog
+var opMutex sync.Mutex
+
+var httpMutex sync.Mutex
+
 var prevLength = 0
 
 var ImplantMap = make(map[string]int)
@@ -22,12 +26,6 @@ type CommandQueueItem struct {
     IDMask   int
 }
 
-type ConnectionLog struct {
-    Time string
-    HostVersion string
-    ID          int
-}
-
 var commandQueue []CommandQueueItem
 
 type Command struct {
@@ -37,6 +35,9 @@ type Command struct {
 }
 
 func OperatorServer() {
+    opMutex.Lock()
+    defer opMutex.Unlock()
+
     http.HandleFunc("/operator", handleOperator)
     http.HandleFunc("/info", handleServerCMDs)
     serverIP, err := getServerIP()
@@ -92,6 +93,9 @@ func createListener(cmdString string, respChan chan<- string) {
 
 
 func httpListener(listenerIP string, listenerPort string) string {
+    httpMutex.Lock()
+    defer httpMutex.Unlock()
+
     http.HandleFunc("/implant", handleImplant)
 
 	// Server configuration

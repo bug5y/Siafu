@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"log"
     "strings"
+    "os/exec"
+    "sync"
 
     "github.com/fstanis/screenresolution"
 	"github.com/gotk3/gotk3/gtk"
     "github.com/gotk3/gotk3/gdk"
     "github.com/gotk3/gotk3/glib"
     "github.com/gotk3/gotk3/pango"
-    "os/exec"
-	
+
 	"Operator/Common"
 	"Operator/Client"
 )
@@ -44,7 +45,6 @@ var cmdPlaceHolder = "Siafu>>"
 var ScreenWidth int 
 var ScreenHeight int
 
-
 var mRefProvider *gtk.CssProvider
 var store *gtk.ListStore
 var entry *gtk.Entry
@@ -55,6 +55,9 @@ var infoTable *gtk.TreeView
 var notebook *gtk.Notebook
 var paned *gtk.Paned
 var vbox *gtk.Box
+
+var connectionMutex sync.Mutex
+var cmdMutex sync.Mutex
 
 func InitUI() {
 
@@ -156,6 +159,8 @@ func BuildUI() {
 func Connections() {
 
     infoTable.Connect("button-press-event", func(tv *gtk.TreeView, ev *gdk.Event) {
+        connectionMutex.Lock()
+        defer connectionMutex.Unlock()
         event := &gdk.EventButton{ev}
         if event.Button() == 3 { // Right mouse button
             // Get the path at the clicked coordinates
@@ -176,6 +181,8 @@ func Connections() {
 
 
     notebook.Connect("switch-page", func(notebook *gtk.Notebook, page *gtk.Widget, pageNum int) {
+        connectionMutex.Lock()
+        defer connectionMutex.Unlock()
         tabInfo := tabInfoMap[pageNum]
 
         if tabInfo != nil {
@@ -759,16 +766,17 @@ func createBuildMenu() *gtk.MenuItem {
 }
 
 func handleCmd(cmd string, buffer *gtk.TextBuffer, entry *gtk.Entry, cmdPlaceHolder string) {
+    cmdMutex.Lock()
+    defer cmdMutex.Unlock()
+
     iter := buffer.GetEndIter()
     buffer.Insert(iter, fmt.Sprintf("%s %s\n", cmdPlaceHolder, cmd))
-    responseChan := make(chan string)
+    go func() { responseChan := make(chan string)
 
-    // Execute the command asynchronously
-    go func() {
         Client.RouteCMD(cmd, responseChan, buffer, entry)
 
         close(responseChan)
-    }()
+   
     
     output, ok := <-responseChan
     if Common.ImplantCmd && !ok {
@@ -776,6 +784,7 @@ func handleCmd(cmd string, buffer *gtk.TextBuffer, entry *gtk.Entry, cmdPlaceHol
         return
     }
     handleOutput(output, buffer)
+    }()
 }
 
 func startListener(ip string, port string, proto string) {
@@ -785,7 +794,7 @@ func startListener(ip string, port string, proto string) {
 
     cmdString := proto + "," + ip + "," +  port
     responseChan := make(chan string)
-    go Client.ServercCommand(cmdGroup, cmdString, responseChan)
+    go Client.ServerCommand(cmdGroup, cmdString, responseChan)
     
     output := <-responseChan
     fmt.Println(output)

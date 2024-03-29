@@ -10,11 +10,18 @@ import (
     "os"
     "path/filepath"
 	"Team-Server/UI"
+	//"Team-Server/Server"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var dbDir string
-var dbPath string
+var DbDir string
+var DbPath string
+var NewConnections []ConnectionLog
+type ConnectionLog struct {
+    Time string
+    HostVersion string
+    ID          int
+}
 
 var green = "#7CFC00"
 
@@ -43,8 +50,8 @@ func buildDB() (*sql.DB, error) {
     }
 
     // Open SQLite database file
-    dbPath = filepath.Join(dbDir, "siafu.db")
-    db, err := sql.Open("sqlite3", dbPath)
+    DbPath = filepath.Join(DbDir, "siafu.db")
+    db, err := sql.Open("sqlite3", DbPath)
     if err != nil {
         log.Fatal(err)
     }
@@ -64,7 +71,7 @@ func buildDB() (*sql.DB, error) {
 }
 
 
-func parseUID(uid string) (string, string) {
+func ParseUID(uid string) (string, string) {
     // Split the UID into its parts
     parts := strings.Split(uid, "-")
     if len(parts) != 2 {
@@ -73,9 +80,9 @@ func parseUID(uid string) (string, string) {
     return parts[0], parts[1]
 }
 
-func isUIDInDB(uid, versionName string) (int, error) {
+func IsUIDInDB(uid, versionName string) (int, error) {
     // Open database connection
-    db, err := sql.Open("sqlite3", dbPath)
+    db, err := sql.Open("sqlite3", DbPath)
     if err != nil {
         return 0, err
     }
@@ -112,7 +119,7 @@ func addToDB(uid, versionName string) (int, error) {
     }
 
     // Open database connection
-    db, err := sql.Open("sqlite3", dbPath)
+    db, err := sql.Open("sqlite3", DbPath)
     if err != nil {
         return 0, err
     }
@@ -132,7 +139,7 @@ func addToDB(uid, versionName string) (int, error) {
     currentTime := time.Now()
     timeString := currentTime.Format("2006-01-02 15:04:05")
 
-    newConnections = append(newConnections, ConnectionLog{
+    NewConnections = append(NewConnections, ConnectionLog{
         Time: timeString,
         HostVersion: versionName,
         ID:          IDMask,
