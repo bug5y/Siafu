@@ -1,0 +1,14 @@
+github.com/fstanis/screenresolution v0.0.0-20190527020317-869904d15333 h1:bIyCNaDet0wYUhGrWQvRAUKR9qa5cQLzSwdfjUbRXS8=
+github.com/fstanis/screenresolution v0.0.0-20190527020317-869904d15333/go.mod h1:d2iTCFnmqCbjn2OyUNkUduH9ZPGf+uqRJS3zwqFb3go=
+github.com/gotk3/gotk3 v0.6.3 h1:+Ke4WkM1TQUNOlM2TZH6szqknqo+zNbX3BZWVXjSHYw=
+github.com/gotk3/gotk3 v0.6.3/go.mod h1:/hqFpkNa9T3JgNAE2fLvCdov7c5bw//FHNZrZ3Uv9/Q=
+github.com/lxn/win v0.0.0-20210218163916-a377121e959e h1:H+t6A/QJMbhCSEH5rAuRxh+CtW96g0Or0Fxa9IKr4uc=
+github.com/lxn/win v0.0.0-20210218163916-a377121e959e/go.mod h1:KxxjdtRkfNoYDCUP5ryK7XJJNTnpC8atvtmTheChOtk=
+github.com/mattn/go-sqlite3 v1.14.22 h1:2gZY6PC6kBnID23Tichd1K+Z0oS6nE/XwU+Vz/5o4kU=
+github.com/mattn/go-sqlite3 v1.14.22/go.mod h1:Uh1q+B4BYcTPb+yiD3kU8Ct7aC0hY9fxUwlHK0RXw+Y=
+github.com/vmihailenco/msgpack/v5 v5.4.1 h1:cQriyiUvjTwOHg8QZaPihLWeRAAVoCpE00IUPn0Bjt8=
+github.com/vmihailenco/msgpack/v5 v5.4.1/go.mod h1:GaZTsDaehaPpQVyxrf5mtQlH+pc21PIudVV/E3rRQok=
+github.com/vmihailenco/tagparser/v2 v2.0.0 h1:y09buUbR+b5aycVFQs/g70pqKVZNBmxwAhO7/IwNM9g=
+github.com/vmihailenco/tagparser/v2 v2.0.0/go.mod h1:Wri+At7QHww0WTrCBeu4J6bNtoV6mEfg5OIWRZA9qds=
+golang.org/x/sys v0.0.0-20201018230417-eeed37f84f13 h1:5jaG59Zhd+8ZXe8C+lgiAGqkOaZBruqrWclLkgAww34=
+golang.org/x/sys v0.0.0-20201018230417-eeed37f84f13/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=

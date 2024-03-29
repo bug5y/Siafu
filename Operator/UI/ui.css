@@ -1,0 +1,78 @@
+@define-color main_fg #ffffff;
+@define-color main_text #000000;
+
+* {
+	font-size: 12.9px;
+    border-radius: 0;
+    margin-top: -1px;
+    margin-bottom: -1px;
+    margin-left: -1px;
+    margin-right: -1px;
+    outline-offset: -3px;
+    outline-color: #000000;	
+}
+
+
+treeview {
+	background-color: #f4cccc;
+	
+}
+
+
+box {
+	background-color: #0d76d5;
+}
+
+window {
+	background-color: #ea0000;
+}
+
+header { 
+	background-color: #4dff00;
+}
+
+entry {
+	background-color: #ffc419;
+	margin-top: -5px;
+}
+
+paned separator { 
+	background-color: #ffc419;
+}
+
+label { /* this covers the button color */
+	background-color: @main_fg;
+	color: @main_text;
+}
+
+menubar { /* Very tippy top menu */
+	background-color: @main_fg;
+}
+
+text { /* both console output and the log */
+	background-color: @main_text;
+}
+
+button { /* Some how controls the color for the table menu & the x button*/
+	background-color: @main_text;
+}
+paned separator { 
+	background-color: #ffc419;
+}
+
+label { /* this covers the button color */
+	background-color: @main_fg;
+	color: @main_text;
+}
+
+menubar { /* Very tippy top menu */
+	background-color: @main_fg;
+}
+
+text { /* both console output and the log */
+	background-color: @main_text;
+}
+
+button { /* Some how controls the color for the table menu & the x button*/
+	background-color: @main_text;
+}
