@@ -100,6 +100,7 @@ func addToCommandQueue(commands [][]string, idMask int) {
 }
 
 func handleUID(uid string) {
+    fmt.Println("UID:", uid)
 	randUID, versionstr := DB.ParseUID(uid)
 	if randUID == "" || versionstr == "" {
 		fmt.Println("Invalid UID format")
@@ -133,6 +134,7 @@ func getVersionString(versionStr string) string {
         return "Invalid version string"
     }
 
+    fmt.Println(uint32(version))
     switch uint32(version) {
     case 0x0500:
         return "Windows 2000"
@@ -145,7 +147,7 @@ func getVersionString(versionStr string) string {
     case 0x0601:
         return "Windows 7"
     case 0x0602:
-        return "Windows 8"
+        return "Windows 10"
     case 0x0603:
         return "Windows 8.1"
     case 0x0A00:

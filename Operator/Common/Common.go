@@ -10,7 +10,7 @@ const (
     BrightRed = "#e14e19" /* use for error notifications */
     AllWhite = "#ffffff" /* text */
 )
-var Protos = []string{"HTTP", "HTTPS"}
+var Protos = []string{"http", "https"}
 
 var ServerURL string // One of these needs to go
 var ServerIP string // One of these needs to go

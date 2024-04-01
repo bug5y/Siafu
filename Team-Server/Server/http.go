@@ -40,6 +40,7 @@ func OperatorServer() {
 
     http.HandleFunc("/operator", handleOperator)
     http.HandleFunc("/info", handleServerCMDs)
+
     serverIP, err := getServerIP()
     if err != nil {
         log.Fatal("Error:", err)
@@ -91,13 +92,10 @@ func createListener(cmdString string, respChan chan<- string) {
     }    
 }
 
-
 func httpListener(listenerIP string, listenerPort string) string {
     httpMutex.Lock()
     defer httpMutex.Unlock()
-
     http.HandleFunc("/implant", handleImplant)
-
 	// Server configuration
     server := &http.Server{
         Addr:    listenerIP + ":" + listenerPort,

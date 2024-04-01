@@ -114,7 +114,7 @@ func InsertLogMarkup(Text string) { // Inserts to log
     currentTime := time.Now()
     formattedTime := "<span foreground=\"" + lightBlue + "\">" + currentTime.Format("2006-01-02 15:04:05") + "</span>"
 
-    markup := formattedTime + " " + indicator + " " + Text
+    markup := formattedTime + " " + indicator + " " + Text + "\n"
 
     logBuffer.InsertMarkup(iter, markup)
 

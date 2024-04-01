@@ -745,7 +745,7 @@ func createBuildMenu() *gtk.MenuItem {
             protoIndex := protoCombo.GetActive()
             proto := protos[protoIndex]
             // Add your listener logic here
-            go startListener(ip, port, proto)
+            builder(ip, port, proto)
             dialog.Hide()
         })
 
@@ -813,6 +813,7 @@ func builder(ip string, port string, proto string) {
     // Command to run the Python script
     cmd := exec.Command("python3", "./Builder/builder.py", ip, port, proto)
 
+    fmt.Println(cmd)
     // Execute the command
     err := cmd.Run()
     if err != nil {

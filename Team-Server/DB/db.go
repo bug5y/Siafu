@@ -9,7 +9,7 @@ import (
 	"database/sql"
     "os"
     "path/filepath"
-	"Team-Server/UI"
+	//"Team-Server/UI"
 	//"Team-Server/Server"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -131,7 +131,6 @@ func addToDB(uid, versionName string) (int, error) {
         return 0, err
     }
 
-    fmt.Print(green)
     fmt.Println("New Connection")
     fmt.Println("Host Version:", versionName)
     fmt.Println("ID:", IDMask)
@@ -145,7 +144,6 @@ func addToDB(uid, versionName string) (int, error) {
         ID:          IDMask,
     })
 
-    fmt.Print(UI.Reset)
     return IDMask, nil
 }
 

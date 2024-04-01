@@ -16,7 +16,6 @@ func main() {
 
     DB.InitDB()
 
-    // Start the server in a goroutine
     go Server.OperatorServer()
 
     UI.BuildUI()
