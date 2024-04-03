@@ -1,38 +1,41 @@
 package Server
 
 import (
-	"database/sql"
 	"strconv"
 	"fmt"
 	"net"
+    "encoding/base64"
 	"Team-Server/DB"
+    "encoding/json"
+    "bytes"
+    //"Team-Server/UI"
 )
 var serverIP string
 
-func updateConnections() []string {
-    // New connections are added to connectionlog in addToDB()
-    serverresp = nil
-    // If changes were made get the changes
-    if len(DB.NewConnections) != prevLength {
-        // If changes were made, format the log
-        var formattedLog string
-        for _, conn := range DB.NewConnections {
-            formattedLog += fmt.Sprintf("Time: %s, Host Version: %s, ID: %d\n", conn.Time, conn.HostVersion, conn.ID)
+func updateConnections(respChan chan<- string) {
+    if len(DB.ConnectionLog) != prevLength {
+        jsonData, err := json.Marshal(DB.ConnectionLog)
+        if err != nil {
+            fmt.Println("Error:", err)
+            return
         }
-        // Append the formatted log to serverresp
-        serverresp = append(serverresp, formattedLog)
-        prevLength = len(DB.NewConnections)
-        return serverresp
+        var buf bytes.Buffer
+        if _, err := buf.Write(jsonData); err != nil {
+            fmt.Println("Error:", err)
+            return
+        }
+        resp := base64.StdEncoding.EncodeToString(buf.Bytes())
+        prevLength = len(DB.ConnectionLog)
+        respChan <- resp
     }
-    return serverresp // No changes
 }
 
+/*
 func getVersionNamesAndUIDs() ([]string, []string, []string, error) {
     var idMasks []string
     var versionNames []string
     var uids []string
 
-    // Collect all ID masks from the ImplantMap
     for _, idMask := range ImplantMap {
         idMasks = append(idMasks, strconv.Itoa(idMask))
     }
@@ -68,7 +71,7 @@ func getVersionNamesAndUIDs() ([]string, []string, []string, error) {
 
     return idMasks, versionNames, uids, nil
 }
-
+*/
 func uint32ToBytes(n uint32) []byte {
     b := make([]byte, 4)
     b[0] = byte(n >> 24)
@@ -82,7 +85,7 @@ func bytesToUint32(b []byte) uint32 {
     return uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
 }
 
-func containsIDMask(idMask int) bool {
+func containsIDMask(idMask string) bool {
     for _, item := range commandQueue {
         if item.IDMask == idMask {
             return true
@@ -91,7 +94,7 @@ func containsIDMask(idMask int) bool {
     return false
 }
 
-func addToCommandQueue(commands [][]string, idMask int) {
+func addToCommandQueue(commands [][]string, idMask string) {
     item := CommandQueueItem{
         Commands: commands,
         IDMask:   idMask,
@@ -99,15 +102,11 @@ func addToCommandQueue(commands [][]string, idMask int) {
     commandQueue = append(commandQueue, item)
 }
 
-func handleUID(uid string) {
-    fmt.Println("UID:", uid)
-	randUID, versionstr := DB.ParseUID(uid)
-	if randUID == "" || versionstr == "" {
-		fmt.Println("Invalid UID format")
-		return
-	}
+func handleUID(uid string, protocol string) {
+	uidParts, FullHash, err := DB.ParseUID(uid, protocol)
+        // get values from the structure
 	
-    value, err := strconv.ParseUint(versionstr, 10, 32)
+    value, err := strconv.ParseUint(uidParts.HostVersion, 10, 32)
     if err != nil {
         fmt.Println("Error:", err)
         return
@@ -118,14 +117,23 @@ func handleUID(uid string) {
 
     versionName := getVersionString(hexString)
 
-    IDMask, err := DB.IsUIDInDB(uid, versionName)
+    err = DB.IsUIDInDB(FullHash, versionName)
 	if err != nil {
 		fmt.Println("Error checking UID:", err)
 		return
 	}
 
     // Update the map with the uid and implant-id mapping
-    ImplantMap[uid] = IDMask
+    //connectionDetails
+    _ , found := DB.ConnectionLog[uid]
+    if found {
+
+    } else {
+
+        return
+    }
+
+    //ImplantMap[uid] = IDMask
 }
 
 func getVersionString(versionStr string) string {
@@ -134,7 +142,6 @@ func getVersionString(versionStr string) string {
         return "Invalid version string"
     }
 
-    fmt.Println(uint32(version))
     switch uint32(version) {
     case 0x0500:
         return "Windows 2000"

@@ -31,14 +31,6 @@ func printTabInfoMap() { // For debugging
     }
 }
 
-func createRow(store *gtk.ListStore, rowData []string) {
-    iter := store.Append()
-
-    for i, value := range rowData {
-        store.SetValue(iter, i, value)
-    }
-}
-
 func handleOutput(output string, buffer *gtk.TextBuffer){ // Inserts to CMD console
     // Insert the output into the text buffer
     iter := buffer.GetEndIter()

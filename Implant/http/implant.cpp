@@ -24,12 +24,7 @@ int waitTimeWithJitter = baseWaitTime + static_cast<int>(jitter);
 bool isRunning = true;
 
 void beacon() {
-    implant::beaconLogic();
-}
-
-std::string beaconLogic() {
     HANDLE hMutex;
-    // create mutex with a name so multiple instances can detect it
     hMutex = CreateMutexA(NULL, FALSE, "BeaconMutex");
     // check if the mutex already exists
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
@@ -37,7 +32,7 @@ std::string beaconLogic() {
         if (hMutex && GetLastError() == ERROR_ALREADY_EXISTS) {
         printf("BeaconMutex already exists, beacon already running\n");
         CloseHandle(hMutex);
-        return "";
+        return;
         }
     }
     while (isRunning) {
@@ -55,9 +50,7 @@ std::string beaconLogic() {
     // cleanup
     if (hMutex)
         CloseHandle(hMutex);
-    return 0;
-    // Return a message indicating that the beacon loop exited
-    return "Exited beacon loop";
+    return;
 }
 
 

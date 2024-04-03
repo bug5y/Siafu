@@ -3,6 +3,7 @@ package Common
 import (
     "time"
     "github.com/gotk3/gotk3/gtk"
+    "sync"
 )
 const (
     LightBlue = "#90afc5" /* selected items & other interactive components */
@@ -11,7 +12,7 @@ const (
     AllWhite = "#ffffff" /* text */
 )
 var Protos = []string{"http", "https"}
-
+var Store *gtk.ListStore
 var ServerURL string // One of these needs to go
 var ServerIP string // One of these needs to go
 var indicator = "<span>[" + "<span foreground=\"" + LightBlue + "\">+</span>" + "]</span>"
@@ -20,17 +21,17 @@ var CurrentBuffer *gtk.TextBuffer
 var CurrentID string
 var ImplantCmd bool
 var ServerCmd bool 
+var mu sync.Mutex
 
 func InsertLogMarkup(Text string) { // Inserts to log
-    
+    mu.Lock()
+    defer mu.Unlock()
     iter := LogBuffer.GetEndIter()
-    
     currentTime := time.Now()
     formattedTime := "<span foreground=\"" + LightBlue + "\">" + currentTime.Format("2006-01-02 15:04:05") + "</span>"
-
     markup := formattedTime + " " + indicator + " " + Text
-
     LogBuffer.InsertMarkup(iter, markup)
+
 }
 
 func InsertLogText(Text string) { // Inserts to log 
@@ -52,4 +53,12 @@ func HandleAlerts(output string, buffer *gtk.TextBuffer, warn bool){ // Inserts 
 
     iter := buffer.GetEndIter()
     buffer.InsertMarkup(iter, output)
+}
+
+func CreateRow(rowData []string) {
+    iter := Store.Append()
+
+    for i, value := range rowData {
+        Store.SetValue(iter, i, value)
+    }
 }

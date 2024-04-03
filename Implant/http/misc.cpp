@@ -9,6 +9,8 @@
 #include <random>
 #include "zlib/zlib.h"
 #include <securitybaseapi.h>
+#include <random>
+#include "base64.hpp"
 #include <codecvt>
 #include <locale>
 #pragma comment(lib, "Advapi32.lib")
@@ -156,10 +158,7 @@ std::string getUsername() {
         return std::string();
     }
 
-    std::wstring usernameWStr(domainNameBuffer.begin(), domainNameBuffer.end());
-    usernameWStr += L"\\"; // Adding backslash between domain name and username
-    usernameWStr.insert(usernameWStr.end(), userNameBuffer.begin(), userNameBuffer.end());
-
+    std::wstring usernameWStr(userNameBuffer.begin(), userNameBuffer.end());
     std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
     return converter.to_bytes(usernameWStr);
 }
@@ -222,6 +221,22 @@ std::vector<std::string> getIP() {
     return addresses;
 }
 
+std::string generateRandomString(int length) {
+    static const char charset[] =
+        "0123456789"
+        "abcdefghijklmnopqrstuvwxyz"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<int> dist(0, sizeof(charset) - 2);
+
+    std::string result;
+    result.reserve(length);
+    for (int i = 0; i < length; ++i) {
+        result += charset[dist(rng)];
+    }
+    return result;
+}
+
 std::string buildUID() {
     OSINFO osInfo;
     ULONG ulFlags = GAA_FLAG_INCLUDE_PREFIX;
@@ -233,18 +248,15 @@ std::string buildUID() {
 
     std::string hostname = getHostname();
     std::string execUsername = getUsername();
-    std::string concatString = hostname + "-" + execUsername + "-" +std::to_string(ver) + "-";
+    std::string randomString = generateRandomString(4);
+    std::string concatString = randomString + "-" + hostname + "-" + execUsername + "-" +std::to_string(ver) + "-";
     std::vector<std::string> ipAddresses = getIP();
         for (const auto& address : ipAddresses) {
             concatString += "," + address;
         }
-    std::cout << "Hostname: " << hostname << std::endl;
-    std::cout << "Executable Username: " << execUsername << std::endl;
-    std::cout << "Concat: " << concatString << std::endl;
-    // Convert the string to a byte array
-    std::vector<Bytef> data(concatString.begin(), concatString.end());
 
-    misc::uid = concatString;
+    std::string base64Concat = macaron::Base64::Encode(concatString);
+    misc::uid = base64Concat;
     return misc::uid;
 }
 

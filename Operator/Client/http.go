@@ -24,6 +24,23 @@ type Command struct {
     Response string `json:"Response"`
 }
 
+type Connections map[string]ConnectionDetails
+
+type ConnectionDetails struct {
+	HostVersion string `json:"HostVersion"`
+	AgentType   string `json:"AgentType"`
+	ImplantID   string `json:"ImplantID"`
+	InternalIP  string `json:"InternalIP"`
+	ExternalIP  string `json:"ExternalIP"`
+	User        string `json:"User"`
+	HostName    string `json:"HostName"`
+	LastSeen    string `json:"LastSeen"`
+	FullHash    string `json:"FullHash"`
+	OrgUID      string `json:"OrgUID"`
+}
+
+var ConnectionLog = Connections{}
+
 var ID_Set bool
 var response string
 
@@ -45,11 +62,11 @@ func InitConnection() { // Add mutex so this can be used to check connections co
     }
 
     if verifyServerUp(Common.ServerURL) {
-        Text := "<span>Connected to server: <span foreground=\"" + Common.AllWhite + "\">" + Common.ServerURL + "</span></span>"
+        Text := "<span>Connected to server: <span foreground=\"" + Common.AllWhite + "\">" + Common.ServerURL + "</span></span>" + "\n"
 		Common.InsertLogMarkup(Text)
 
     } else {
-        Text := "<span foreground=\"" + Common.BrightRed + "\">Unable to connect to server: <span foreground=\"" + Common.AllWhite + "\">" + Common.ServerURL + "</span></span>"
+        Text := "<span foreground=\"" + Common.BrightRed + "\">Unable to connect to server: <span foreground=\"" + Common.AllWhite + "\">" + Common.ServerURL + "</span></span>" + "\n"
         Common.InsertLogMarkup(Text)
     }
 }
@@ -64,11 +81,32 @@ func UpdateLog() {
 		}()
 		// Wait for the response or timeout
 		select {
-		case logText := <-responseChan:
-			if logText != "" {
-				Common.InsertLogMarkup(logText)
+		case base64Log := <-responseChan:
+			if base64Log != "" {
+				var updatedLog map[string]ConnectionDetails
+				byteData, _ := base64.StdEncoding.DecodeString(base64Log)
+				if err := json.Unmarshal(byteData, &updatedLog); err != nil {
+					return
+				}
+
+				for key, connection := range updatedLog {
+					if _, exists := ConnectionLog[key]; !exists {
+						text := "New connection\n"
+						fmt.Println(connection.User)
+						Common.InsertLogMarkup(text)
+					}
+				}
+				// Override ConnectionLog with updatedLog
+				ConnectionLog = updatedLog
+				for _, connection := range ConnectionLog {
+				// if connection.User has a \ the part before is the domain the part after is userid
+				
+				data := []string{connection.HostVersion, connection.AgentType, connection.ImplantID, connection.HostName, connection.User, connection.InternalIP, connection.ExternalIP, connection.LastSeen}
+				Common.CreateRow(data)
+				}
+			
 			}
-		
+		//Common.InsertLogMarkup(logText)
 		case <-time.After(5 * time.Second):
 		}
 

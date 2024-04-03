@@ -46,7 +46,7 @@ var ScreenWidth int
 var ScreenHeight int
 
 var mRefProvider *gtk.CssProvider
-var store *gtk.ListStore
+
 var entry *gtk.Entry
 var entryDialog *gtk.Dialog
 var win *gtk.Window
@@ -118,22 +118,17 @@ func InitUI() {
     paned.Pack1(topPaned, true, true)
 
     // Table
+    scrolledTable, _ := gtk.ScrolledWindowNew(nil, nil)
+    scrolledTable.SetPolicy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
     infoTable, _ = gtk.TreeViewNew()
-    topPaned.Pack1(infoTable, true, true)
+    scrolledTable.Add(infoTable)
+    topPaned.Pack1(scrolledTable, true, true)
     TableWidth := int(float64(ScreenWidth) * 0.55)
     topPaned.SetPosition(TableWidth)
 
     // Create a list store
-    store, _ = gtk.ListStoreNew(glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING)
-
-    createTable(infoTable, store)
-
-    // Debugging
-    data := []string{"Linux", "Desktop", "123", "192.168.1.100", "192.168.0.1, 192.168.0.2", "hostname", "user1", "2024-03-22"} // Debugging
-    createRow(store, data) // Debugging
-
-    data = []string{"Linux", "Desktop", "234", "192.168.1.100", "192.168.0.1, 192.168.0.2", "hostname", "user1", "2024-03-22"} // Debugging
-    createRow(store, data) // Debugging
+    Common.Store, _ = gtk.ListStoreNew(glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING, glib.TYPE_STRING)
+    createTable(infoTable, Common.Store)
 
     scrolledText, _ := gtk.ScrolledWindowNew(nil, nil)
     topPaned.Pack2(scrolledText, true, true)
@@ -174,7 +169,7 @@ func Connections() {
                 selection.SelectPath(path)
                 // Display the context menu
                 var parent *gtk.Window
-                showContextMenu(notebook, vbox, win, cmdPlaceHolder, parent, tv, ev, store, paned)
+                showContextMenu(notebook, vbox, win, cmdPlaceHolder, parent, tv, ev, Common.Store, paned)
             }
         }
     })
@@ -204,7 +199,7 @@ func Connections() {
 }
 
 func createTable(infoTable *gtk.TreeView, store *gtk.ListStore) {
-    columns := []string{"OS", "Agent Type", "Implant ID", "External IP", "Internal IP(s)", "Host Name", "User", "Last Seen"}
+    columns := []string{"OS", "Agent Type", "UID", "Host Name", "User", "External IP", "Internal IP(s)", "Last Seen"}
 
     // Set the list store as the model for the tree view
     infoTable.SetModel(store)
@@ -636,8 +631,6 @@ func createServerMenu() *gtk.MenuItem {
         }
         proto := protos[protoIndex]
     
-        fmt.Println("Listener IP:", ip)
-        fmt.Println("Listener Port:", port)
         // Add your listener logic here
         go startListener(ip, port, proto)
         startListenerDialog.Hide()
@@ -788,7 +781,6 @@ func handleCmd(cmd string, buffer *gtk.TextBuffer, entry *gtk.Entry, cmdPlaceHol
 }
 
 func startListener(ip string, port string, proto string) {
-    fmt.Print(proto, " listener at ", ip + ":" + port)
 
     cmdGroup := "listener"
 
@@ -797,13 +789,12 @@ func startListener(ip string, port string, proto string) {
     go Client.ServerCommand(cmdGroup, cmdString, responseChan)
     
     output := <-responseChan
-    fmt.Println(output)
 
     if strings.Contains(output, "listener started") {
-        output := proto + " listener started at " + Common.ServerIP + ":" + port
-        Common.InsertLogText(output)
+        output := "Listener started at " + proto + "://" + ip + ":" + port + "\n"
+        Common.InsertLogMarkup(output)
     } else {
-        output := "Unable to start listener"
+        //output := "Unable to start listener"
         Common.InsertLogMarkup(output)
     }
 

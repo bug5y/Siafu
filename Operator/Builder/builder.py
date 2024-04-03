@@ -76,7 +76,7 @@ def main():
         sys.exit(3)
 
 def replaceItems(proto, ip, port, temp_folder):
-    formed_url = f"{proto}://{ip}:{port}/implant"
+    formed_url = f"{proto}://{ip}:{port}/{port}"
     file_path = os.path.join(temp_folder, proto, "implant.cpp")
     with open(file_path, "r") as file:
         filedata = file.read()
