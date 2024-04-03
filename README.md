@@ -27,3 +27,4 @@ Siafu is a C2 written in Go and C++ consisting of three main components:
 ### To-Do
 - Fix memory based crashes on server and operator
 - Sort IPs into external and internal IPs
+- Sort out uid issues
