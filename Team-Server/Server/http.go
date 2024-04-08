@@ -11,7 +11,6 @@ import (
 )
 
 var opMutex sync.Mutex
-
 var httpMutex sync.Mutex
 
 var prevLength = 0
@@ -35,9 +34,6 @@ type Command struct {
 }
 
 func OperatorServer() {
-    opMutex.Lock()
-    defer opMutex.Unlock()
-
     http.HandleFunc("/operator", handleOperator)
     http.HandleFunc("/info", handleServerCMDs)
 
@@ -102,13 +98,7 @@ func createListener(cmdString string, respChan chan<- string) {
     }    
 }
 
-/*
-
-*/
-
 func httpListener(listenerIP string, listenerPort string) string {
-    httpMutex.Lock()
-    defer httpMutex.Unlock()
     endPoint := "/" + listenerPort
     http.HandleFunc(endPoint, handleImplant)
 

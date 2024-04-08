@@ -19,29 +19,9 @@ import (
 
 var bufferIndex int
 
-type TabInfo struct {
-    PageIndex int
-    ID string
-    TabLabel   *gtk.Label       // Label for the tab
-    Buffer *gtk.TextBuffer           // Name of the buffer associated with the tab
-    Entry      *gtk.Entry       // Entry widget associated with the tab
-    Button *gtk.Button
-}
-
-var tabInfoMap = make(map[int]*TabInfo)
-var labelMap map[*gtk.Label]int
-
-//var currentBuffer *gtk.TextBuffer
-var currentEntry *gtk.Entry 
-var currentPage int
-
-var ID string
-
-
 var nilButton *gtk.Button = nil
 var entryCount = 0
 
-var cmdPlaceHolder = "Siafu>>"
 var ScreenWidth int 
 var ScreenHeight int
 
@@ -58,9 +38,11 @@ var vbox *gtk.Box
 
 var connectionMutex sync.Mutex
 var cmdMutex sync.Mutex
+var ID string
+var PlaceHolder = "Siafu>>"
+
 
 func InitUI() {
-
     gtk.Init(nil)
     
     win, _ = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
@@ -97,10 +79,10 @@ func InitUI() {
     notebook, _ = gtk.NotebookNew()
     paned, _ = gtk.PanedNew(gtk.ORIENTATION_VERTICAL)
 
-
-    labelMap = make(map[*gtk.Label]int)
+    Common.LabelMap = make(map[*gtk.Label]int)
     tabName := ""
-    fileMenu := createFileMenu(win, notebook, vbox, cmdPlaceHolder, tabName, paned)
+
+    fileMenu := createFileMenu(win, notebook, vbox, PlaceHolder, tabName, paned)
     buildMenu := createBuildMenu()
 
     menubar.Append(fileMenu)
@@ -138,9 +120,12 @@ func InitUI() {
 
     serverMenu := createServerMenu()
     menubar.Append(serverMenu)
-    Common.LogBuffer, _ = servertxt.GetBuffer()
 
-	initPlaceHolder(entry, cmdPlaceHolder)
+    Common.AL.LogBufferMu.Lock()
+    defer Common.AL.LogBufferMu.Unlock()
+    Common.AL.LogBuffer, _ = servertxt.GetBuffer()
+
+	initPlaceHolder(entry)
 }
 
 func BuildUI() {
@@ -152,7 +137,7 @@ func BuildUI() {
 }
 
 func Connections() {
-
+    
     infoTable.Connect("button-press-event", func(tv *gtk.TreeView, ev *gdk.Event) {
         connectionMutex.Lock()
         defer connectionMutex.Unlock()
@@ -169,25 +154,29 @@ func Connections() {
                 selection.SelectPath(path)
                 // Display the context menu
                 var parent *gtk.Window
-                showContextMenu(notebook, vbox, win, cmdPlaceHolder, parent, tv, ev, Common.Store, paned)
+
+                Common.CT.CurrentMutex.Lock()
+                defer Common.CT.CurrentMutex.Unlock()
+                showContextMenu(notebook, vbox, win, PlaceHolder, parent, tv, ev, Common.Store, paned)
             }
         }
     })
-
-
+    
     notebook.Connect("switch-page", func(notebook *gtk.Notebook, page *gtk.Widget, pageNum int) {
-        connectionMutex.Lock()
-        defer connectionMutex.Unlock()
-        tabInfo := tabInfoMap[pageNum]
+        tab := Common.TabMap[pageNum]
 
-        if tabInfo != nil {
-            Common.CurrentID = tabInfo.ID
-            Common.CurrentBuffer = tabInfo.Buffer
-            currentEntry = tabInfo.Entry
-            currentPage = tabInfo.PageIndex
+        if tab != nil {
+            Common.CT.CurrentMutex.Lock()
+            defer Common.CT.CurrentMutex.Unlock()
+        
+            Common.CT.CurrentID = tab.ID
+            Common.CT.CurrentBuffer = tab.Buffer
+            Common.CT.CurrentEntry = tab.Entry
+            Common.CT.CurrentPage = tab.PageIndex
+
         } 
         curpg := notebook.GetCurrentPage()
-        for in, tab := range tabInfoMap {
+        for in, tab := range Common.TabMap {
             if in == curpg {
                 tab.Entry.SetVisible(true)
             } else {
@@ -199,7 +188,7 @@ func Connections() {
 }
 
 func createTable(infoTable *gtk.TreeView, store *gtk.ListStore) {
-    columns := []string{"OS", "Agent Type", "UID", "Host Name", "User", "External IP", "Internal IP(s)", "Last Seen"}
+    columns := []string{"OS", "Agent Type", "UID", "Host Name", "User", "Internal IP(s)", "External IP(s)", "Last Seen"}
 
     // Set the list store as the model for the tree view
     infoTable.SetModel(store)
@@ -222,13 +211,13 @@ func createTable(infoTable *gtk.TreeView, store *gtk.ListStore) {
 
 }
 
-func showContextMenu(notebook *gtk.Notebook, vbox *gtk.Box, win *gtk.Window, cmdPlaceHolder string, parent *gtk.Window, tv *gtk.TreeView, ev *gdk.Event, store *gtk.ListStore, paned *gtk.Paned) {
+func showContextMenu(notebook *gtk.Notebook, vbox *gtk.Box, win *gtk.Window, PlaceHolder string, parent *gtk.Window, tv *gtk.TreeView, ev *gdk.Event, store *gtk.ListStore, paned *gtk.Paned) {
 	menu, _ := gtk.MenuNew()
     
 	// "Open Console" 
 	menuItemOpenConsole, _ := gtk.MenuItemNewWithLabel("Open Console")
 	menuItemOpenConsole.Connect("activate", func() {
-        newConsole(notebook, vbox, win, cmdPlaceHolder, tv, store, paned)
+        newConsole(notebook, vbox, win, PlaceHolder, tv, store, paned)
 	})
 	menu.Append(menuItemOpenConsole)
 
@@ -247,7 +236,8 @@ func showContextMenu(notebook *gtk.Notebook, vbox *gtk.Box, win *gtk.Window, cmd
 	menu.PopupAtPointer(nil)
 }
 
-func setupTab(notebook *gtk.Notebook, vbox *gtk.Box, win *gtk.Window, cmdPlaceHolder string, tabName string, paned *gtk.Paned) {
+func setupTab(notebook *gtk.Notebook, vbox *gtk.Box, win *gtk.Window, PlaceHolder string, tabName string, paned *gtk.Paned) {
+    fmt.Println("setuptab")
     i := 0
     cmdlog, _ := gtk.ScrolledWindowNew(nil, nil)
     cmdtxt, _ := gtk.TextViewNew()
@@ -275,35 +265,38 @@ func setupTab(notebook *gtk.Notebook, vbox *gtk.Box, win *gtk.Window, cmdPlaceHo
     pageIndex := notebook.GetNPages() - 1
 
     // Create a unique entry field for each tab
-    entry := createEntry()
+    cmdentry := createEntry()
 
-    initPlaceHolder(entry, cmdPlaceHolder)
+    initPlaceHolder(cmdentry)
     
-    entry.SetName("entrytab_" + string(i))
+    i++
+
+    cmdentry.SetName("entrytab_" + string(i))
 
     // Create a unique buffer for each tab
-    buffer, _ := cmdtxt.GetBuffer()
+    cmdbuffer, _ := cmdtxt.GetBuffer()
     bufferIndex++
-    vbox.PackEnd(entry, false, false, 0)
+    vbox.PackEnd(cmdentry, false, false, 0)
 
-    // Store tab information in the map with tabLabel text as the key
-    tabInfoMap[pageIndex] = &TabInfo{
+    Common.TabMap[pageIndex] = &Common.Tabs{
         ID: ID,
         PageIndex: pageIndex,
         TabLabel:   tabLabel,
-        Buffer: buffer,
-        Entry:      entry,
+        Buffer: cmdbuffer,
+        Entry:      cmdentry,
         Button: button,
     }
 
-    entry.Connect("activate", func() {
-        cmd, _ := entry.GetText()
-        handleCmd(cmd, Common.CurrentBuffer, currentEntry, cmdPlaceHolder)
-        entry.SetText("")
+    cmdentry.Connect("activate", func() {
+        cmd, _ := cmdentry.GetText()
+
+        handleCmd(cmd)
+        cmdentry.SetText("")
     })
+
     notebook.ShowAll()
     newPage := notebook.GetCurrentPage()
-        for in, tab := range tabInfoMap {
+        for in, tab := range Common.TabMap {
             if in == newPage {
                 tab.Entry.SetVisible(true)
             } else {
@@ -332,34 +325,59 @@ func removeImplant(tv *gtk.TreeView, store *gtk.ListStore, notebook *gtk.Noteboo
 	}
 }
 
-func newConsole(notebook *gtk.Notebook, vbox *gtk.Box, win *gtk.Window, cmdPlaceHolder string, tv *gtk.TreeView, store *gtk.ListStore, paned *gtk.Paned) {
-    selection, _ := tv.GetSelection()
-    _, iter, _ := selection.GetSelected()
+func newConsole(notebook *gtk.Notebook, vbox *gtk.Box, win *gtk.Window, PlaceHolder string, tv *gtk.TreeView, store *gtk.ListStore, paned *gtk.Paned) {
+    fmt.Println("newconsole")
+    selection, err := tv.GetSelection()
+    if err != nil {
+		fmt.Println("Error getting selection:", err)
+		return
+	}
+	_, iter, status := selection.GetSelected()
+	if !status {
+		fmt.Println("Error getting selected item")
+		return
+	}
 
     model, err := tv.GetModel()
     if err != nil {
+        fmt.Println("Error getting model:", err)
+		return
     }
 
     listStore, ok := model.(*gtk.ListStore)
     if !ok {
+        fmt.Println("Error casting model to *gtk.ListStore")
+		return
     }
 
     if iter != nil {
         // Retrieve data from each column and convert to string
-        col2Value, _ := listStore.GetValue(iter, 2) // ID
+        col2Value, err := listStore.GetValue(iter, 2) // ID
+        if err != nil {
+			fmt.Println("Error getting value from column 2:", err)
+			return
+		}
         col2, _ := col2Value.GetString()
 
-        col5Value, _ := listStore.GetValue(iter, 5) // User
-        col5, _ := col5Value.GetString()
+        col4Value, err := listStore.GetValue(iter, 4) // User
+        if err != nil {
+			fmt.Println("Error getting value from column 4:", err)
+			return
+		}
+        col4, _ := col4Value.GetString()
 
-        col6Value, _ := listStore.GetValue(iter, 6) // Host
-        col6, _ := col6Value.GetString()
+        col3Value, err := listStore.GetValue(iter, 3) // Host
+        if err != nil {
+			fmt.Println("Error getting value from column 3:", err)
+			return
+		}
+        col3, _ := col3Value.GetString()
 
-        tabName := col2 + ": " + col6 + "@" + col5
+        tabName := col2 + ": " + col4 + "@" + col3
 
         ID = col2
 
-        setupTab(notebook, vbox, win, cmdPlaceHolder, tabName, paned)
+        setupTab(notebook, vbox, win, PlaceHolder, tabName, paned)
 
     } else {
         fmt.Println("No item selected")
@@ -419,26 +437,26 @@ func removeTab(notebook *gtk.Notebook, paned *gtk.Paned, vbox *gtk.Box, win *gtk
     var e *gtk.Entry
     if button != nil && removeID == "" {
         // Get the page index using the button value
-        for pageIndex, tabInfo := range tabInfoMap {
-            if tabInfo.Button == button {
+        for pageIndex, tab := range Common.TabMap {
+            if tab.Button == button {
                 page = pageIndex
                 fmt.Println("From page", pageIndex)
-                e = tabInfoMap[pageIndex].Entry
+                e = Common.TabMap[pageIndex].Entry
                 break
             }
         } 
     } else if button == nil && removeID != ""{
-        for pageIndex, tabInfo := range tabInfoMap {
-            if tabInfo.ID == removeID {
+        for pageIndex, tab := range Common.TabMap {
+            if tab.ID == removeID {
                 page = pageIndex
-                e = tabInfoMap[pageIndex].Entry
+                e = Common.TabMap[pageIndex].Entry
             }
         } 
     } else {
         fmt.Println("Something went wrong")
     }
 
-    tabInfo, exists := tabInfoMap[page]
+    tab, exists := Common.TabMap[page]
 
     if !exists {
         fmt.Println(page, "does not exist")
@@ -447,14 +465,14 @@ func removeTab(notebook *gtk.Notebook, paned *gtk.Paned, vbox *gtk.Box, win *gtk
 
     notebook.RemovePage(page)
 
-    if tabInfo != nil {
-        delete(tabInfoMap, page)
+    if tab != nil {
+        delete(Common.TabMap, page)
     } else {
-        fmt.Println("tabInfo does not exist for", page)
+        fmt.Println("tab does not exist for", page)
         return
     }
 
-    for _, info := range tabInfoMap {
+    for _, info := range Common.TabMap {
         if info.PageIndex > page {
             // Decrement pageIndex for tabs after the removed page
             info.PageIndex--
@@ -462,16 +480,16 @@ func removeTab(notebook *gtk.Notebook, paned *gtk.Paned, vbox *gtk.Box, win *gtk
     }
 
     // Update the keys 
-    updateMap := make(map[int]*TabInfo)
-    for _, info := range tabInfoMap {
+    updateMap := make(map[int]*Common.Tabs)
+    for _, info := range Common.TabMap {
         updateMap[info.PageIndex] = info
     }
-    tabInfoMap = updateMap
+    Common.TabMap = updateMap
 
     vbox.Remove(e)
 
     newPage := notebook.GetCurrentPage()
-        for in, tab := range tabInfoMap {
+        for in, tab := range Common.TabMap {
             if in == newPage {
                 tab.Entry.SetVisible(true)
             } else {
@@ -479,13 +497,13 @@ func removeTab(notebook *gtk.Notebook, paned *gtk.Paned, vbox *gtk.Box, win *gtk
             }
         }
 
-    if len(tabInfoMap) == 0 {
+    if len(Common.TabMap) == 0 {
         paned.Remove(notebook)
     }
 }
 
 
-func createFileMenu(win *gtk.Window, notebook *gtk.Notebook, vbox *gtk.Box, cmdPlaceHolder string, tabName string, paned *gtk.Paned) *gtk.MenuItem {
+func createFileMenu(win *gtk.Window, notebook *gtk.Notebook, vbox *gtk.Box, PlaceHolder string, tabName string, paned *gtk.Paned) *gtk.MenuItem {
     menu, _ := gtk.MenuItemNewWithLabel("File")
     submenu, _ := gtk.MenuNew()
     
@@ -758,30 +776,40 @@ func createBuildMenu() *gtk.MenuItem {
     return menu
 }
 
-func handleCmd(cmd string, buffer *gtk.TextBuffer, entry *gtk.Entry, cmdPlaceHolder string) {
+func handleCmd(cmd string) {
+    fmt.Println("handlecmd")
+    Common.CT.CurrentMutex.Lock()
+    defer Common.CT.CurrentMutex.Unlock()
+
+    buffer := Common.CT.CurrentBuffer
+    
+    var sort Common.Sorting
+
     cmdMutex.Lock()
     defer cmdMutex.Unlock()
 
     iter := buffer.GetEndIter()
-    buffer.Insert(iter, fmt.Sprintf("%s %s\n", cmdPlaceHolder, cmd))
-    go func() { responseChan := make(chan string)
+    buffer.Insert(iter, fmt.Sprintf("%s %s\n", PlaceHolder, cmd))
+    go func() { 
+        Client.RouteCMD(cmd, Common.CommandChan)
 
-        Client.RouteCMD(cmd, responseChan, buffer, entry)
-
-        close(responseChan)
+        close(Common.CommandChan)
    
-    
-    output, ok := <-responseChan
-    if Common.ImplantCmd && !ok {
-        fmt.Println("Response channel was closed unexpectedly")
-        return
-    }
-    handleOutput(output, buffer)
+        sort.SortingMutex.Lock()
+        defer sort.SortingMutex.Unlock()
+        output, ok := <-Common.CommandChan // from http implantcmd
+        fmt.Println("Output", output)
+        if sort.ImplantCmd && !ok {
+            fmt.Println("Response channel was closed unexpectedly")
+            return
+        }
+        Common.CT.CurrentMutex.Lock()
+        defer Common.CT.CurrentMutex.Unlock()
+        Common.CommandOutput(output, Common.CT.CurrentBuffer)
     }()
 }
 
 func startListener(ip string, port string, proto string) {
-
     cmdGroup := "listener"
 
     cmdString := proto + "," + ip + "," +  port

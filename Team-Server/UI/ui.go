@@ -5,6 +5,9 @@ import (
 	"github.com/gotk3/gotk3/gtk"
     "github.com/gotk3/gotk3/gdk"
 	"time"
+    "sync"
+    "log"
+    "fmt"
 )
 
 
@@ -14,6 +17,8 @@ var screen *gdk.Screen
 var ScreenWidth int 
 var ScreenHeight int 
 var win *gtk.Window 
+var logMutex sync.Mutex
+var bufferMu sync.Mutex 
 
 const (
     lightBlue = "#90afc5" /* selected items & other interactive components */
@@ -46,23 +51,50 @@ func InitUI() {
     // Create a Box for organizing widgets
 	box, _ := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
 
+    menubar, _ := gtk.MenuBarNew()
 	// Create menu
-	menuBar := createFileMenu()
-	box.PackStart(menuBar, false, false, 0)
+	fileMenu := createFileMenu()
+    menubar.Append(fileMenu)
+
+	box.PackStart(menubar, false, false, 0)
+
+	notebook, err := gtk.NotebookNew()
+	if err != nil {
+		log.Fatal("Unable to create notebook:", err)
+	}
 
 	// Create a box for holding the text view
 	textBox, _ := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
-	box.PackStart(textBox, true, true, 0)
+	textBox.SetHExpand(true)
+	textBox.SetVExpand(true)
 
 	// Create a scrolled window
 	scrolledWin, _ := gtk.ScrolledWindowNew(nil, nil)
 	scrolledWin.SetPolicy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-	textBox.PackStart(scrolledWin, true, true, 0)
 
 	// Create a text view
 	servertxt, _ := gtk.TextViewNew()
 	servertxt.SetEditable(false)
 	scrolledWin.Add(servertxt)
+
+	// Add scrolled window to the box
+	textBox.PackStart(scrolledWin, true, true, 0)
+
+	page, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
+	if err != nil {
+		log.Fatal("Unable to create notebook page:", err)
+	}
+	page.SetHExpand(true)
+	page.SetVExpand(true)
+	page.Add(textBox)
+
+	label, err := gtk.LabelNew("Actvity Log")
+	if err != nil {
+		log.Fatal("Unable to create label:", err)
+	}
+	notebook.AppendPage(page, label)
+
+    box.PackEnd(notebook, true, true, 0)
 
 	win.Add(box)
 
@@ -108,20 +140,19 @@ func createFileMenu() *gtk.MenuItem {
 
 
 func InsertLogMarkup(Text string) { // Inserts to log
+    fmt.Println("insertlogmarkup")
+    logMutex.Lock()
+    defer logMutex.Unlock()
+
+    bufferMu.Lock()
+    defer bufferMu.Unlock()
 
     iter := logBuffer.GetEndIter()
     
     currentTime := time.Now()
-    formattedTime := "<span foreground=\"" + lightBlue + "\">" + currentTime.Format("2006-01-02 15:04:05") + "</span>"
+    formattedTime := "<span foreground=\"" + lightBlue + "\">" + "  " + currentTime.Format("2006-01-02 15:04:05") + "</span>"
 
     markup := formattedTime + " " + indicator + " " + Text + "\n"
-
     logBuffer.InsertMarkup(iter, markup)
-
-}
-
-func InsertLogText(Text string) { // Inserts to log 
-	    iter := logBuffer.GetEndIter()
-        logBuffer.Insert(iter, Text)
 
 }

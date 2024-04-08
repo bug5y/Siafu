@@ -4,13 +4,15 @@ package main
 import (
     "Operator/UI"
     "Operator/Client"
+    "fmt"
 )
 
 func main() {
 
+    fmt.Println("main")
     UI.InitUI()
 
-    Client.InitConnection()
+    Client.ServerConnection()
 
     go Client.UpdateLog()
 

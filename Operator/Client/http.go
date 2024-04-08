@@ -41,6 +41,8 @@ type ConnectionDetails struct {
 
 var ConnectionLog = Connections{}
 
+var cur Common.CurrentTab
+
 var ID_Set bool
 var response string
 
@@ -49,30 +51,53 @@ var defaultPort = "8443"
 
 var routeMutex sync.Mutex 
 
-func InitConnection() { // Add mutex so this can be used to check connections continuosly
+func ServerConnection() {
+	fmt.Println("serverconnection")
     if Common.ServerURL == "" {
         defaultIP, err := getIP()
         if err != nil {
             Text := "Failed to set an address for the server"
-            Common.InsertLogText(Text)
+            Common.InsertLogMarkup(Text)
         }
         port = defaultPort
         url := "http://" + defaultIP + ":" + port
 		Common.ServerURL = url
     }
 
-    if verifyServerUp(Common.ServerURL) {
-        Text := "<span>Connected to server: <span foreground=\"" + Common.AllWhite + "\">" + Common.ServerURL + "</span></span>" + "\n"
-		Common.InsertLogMarkup(Text)
-
-    } else {
-        Text := "<span foreground=\"" + Common.BrightRed + "\">Unable to connect to server: <span foreground=\"" + Common.AllWhite + "\">" + Common.ServerURL + "</span></span>" + "\n"
-        Common.InsertLogMarkup(Text)
-    }
+	go func() {
+		var status bool
+		if verifyServerUp(Common.ServerURL) {
+			Text := "<span>Connected to server: <span foreground=\"" + Common.AllWhite + "\">" + Common.ServerURL + "</span></span>" + "\n"
+			Common.InsertLogMarkup(Text)
+			status = true
+		} else {
+			Text := "<span foreground=\"" + Common.BrightRed + "\">Unable to connect to server: <span foreground=\"" + Common.AllWhite + "\">" + Common.ServerURL + "</span></span>" + "\n"
+			Common.InsertLogMarkup(Text)
+			status = false
+		}
+		for {
+			if !status {
+				if verifyServerUp(Common.ServerURL) {
+					Text := "<span>Connected to server: <span foreground=\"" + Common.AllWhite + "\">" + Common.ServerURL + "</span></span>" + "\n"
+					Common.InsertLogMarkup(Text)
+					status = true
+				}
+			} 
+			if status {
+				if !verifyServerUp(Common.ServerURL) {
+					Text := "<span foreground=\"" + Common.BrightRed + "\">Unable to connect to server: <span foreground=\"" + Common.AllWhite + "\">" + Common.ServerURL + "</span></span>" + "\n"
+					Common.InsertLogMarkup(Text)
+					status = false
+				}
+			}
+			time.Sleep(1 * time.Second)
+		}
+	}()
 }
 
 func UpdateLog() { 
 	for {
+		fmt.Println("updatelog")
 		cmdGroup := "log"
 		cmdString := ""
 		responseChan := make(chan string)
@@ -89,36 +114,36 @@ func UpdateLog() {
 					return
 				}
 
-				for key, connection := range updatedLog {
-					if _, exists := ConnectionLog[key]; !exists {
-						text := "New connection\n"
-						fmt.Println(connection.User)
+				for key, connectionDetails := range updatedLog {
+                    if existingConnection, exists := ConnectionLog[key]; exists {
+                        existingConnection.LastSeen = connectionDetails.LastSeen
+                        ConnectionLog[key] = existingConnection
+						Common.UpdateRow(key, existingConnection.LastSeen)
+					} else {
+						text := "New connection" + " " + key + "\n"
 						Common.InsertLogMarkup(text)
+						ConnectionLog[key] = connectionDetails
+						data := []string{connectionDetails.HostVersion, connectionDetails.AgentType, connectionDetails.ImplantID, connectionDetails.HostName, connectionDetails.User, connectionDetails.InternalIP, connectionDetails.ExternalIP, connectionDetails.LastSeen}
+						Common.CreateRow(data)
 					}
 				}
 				// Override ConnectionLog with updatedLog
 				ConnectionLog = updatedLog
-				for _, connection := range ConnectionLog {
-				// if connection.User has a \ the part before is the domain the part after is userid
-				
-				data := []string{connection.HostVersion, connection.AgentType, connection.ImplantID, connection.HostName, connection.User, connection.InternalIP, connection.ExternalIP, connection.LastSeen}
-				Common.CreateRow(data)
-				}
-			
 			}
-		//Common.InsertLogMarkup(logText)
-		case <-time.After(5 * time.Second):
+		case <-time.After(2 * time.Second):
 		}
-
-		// Sleep for 5 seconds before fetching logs again
-		time.Sleep(5 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 }
 
+func RouteCMD(input string, responseChan chan<- string) {
+	fmt.Println("routecmd")
+	var sort Common.Sorting
 
-func RouteCMD(input string, responseChan chan<- string, buffer *gtk.TextBuffer, entry *gtk.Entry) {
-    routeMutex.Lock()
-    defer routeMutex.Unlock()
+	buffer := Common.CT.CurrentBuffer
+
+	sort.SortingMutex.Lock()
+    defer sort.SortingMutex.Unlock()
 	// Trim spaces and newline characters from the input
 	input = strings.TrimSpace(input)
 	
@@ -127,57 +152,55 @@ func RouteCMD(input string, responseChan chan<- string, buffer *gtk.TextBuffer, 
 	if len(parts) < 2 {
 		output := "Invalid command. Please provide a command group and a command.\n"
 		warn := true
-		Common.HandleAlerts(output, buffer, warn)
+		Common.CT.CurrentMutex.Lock()
+		defer Common.CT.CurrentMutex.Unlock()
+		Common.ConsoleAlerts(output, buffer, warn)
 		return
 	}
 
 	cmdGroup := parts[0]
 	switch cmdGroup {
 	case "shell":
-		Common.ImplantCmd = true
-	case "implant":
-		ID_Set = false
-		for _, part := range parts {
-			if strings.HasPrefix(part, "-s") {
-				fmt.Println("Remove this")
-			}
-		}
-		if !ID_Set {
-			Common.ServerCmd = true
-		}
+		sort.ImplantCmd = true
 		
 	default:
 		output := "Invalid command group\n"
 		warn := true
-		Common.HandleAlerts(output, buffer, warn)
+		Common.CT.CurrentMutex.Lock()
+		defer Common.CT.CurrentMutex.Unlock()
+		Common.ConsoleAlerts(output, buffer, warn)
 		return
 	}
 	cmdString := strings.Join(parts[1:], " ")
 
-	if Common.ImplantCmd {
-		err := ImplantCommand(cmdGroup, cmdString, responseChan, Common.CurrentBuffer, Common.CurrentID)
+	if sort.ImplantCmd {
+		Common.CT.CurrentMutex.Lock()
+		defer Common.CT.CurrentMutex.Unlock()
+		err := ImplantCommand(cmdGroup, cmdString, responseChan, Common.CT.CurrentBuffer, Common.CT.CurrentID)
 		if err != nil {
 			output := fmt.Sprintf("Error sending command: %v\n", err)
 			warn := true
-			Common.HandleAlerts(output, buffer, warn)
+			Common.ConsoleAlerts(output, buffer, warn)
 			return
 		}
 	}
 	
-	if Common.ServerCmd {
+	if sort.ServerCmd {
 		
 		err := ServerCommand(cmdGroup, cmdString, responseChan)
 		if err != nil {
 			output := fmt.Sprintf("Error sending command: %v\n", err)
 			warn := true
-			Common.HandleAlerts(output, buffer, warn)
+			Common.CT.CurrentMutex.Lock()
+			defer Common.CT.CurrentMutex.Unlock()
+			Common.ConsoleAlerts(output, buffer, warn)
 			return
 		}
 	}
 }
 
-func ImplantCommand(cmdGroup, cmdString string, responseChan chan<- string, buffer *gtk.TextBuffer, implantID string) error {
-
+func ImplantCommand(cmdGroup, cmdString string, CommandChan chan<- string, buffer *gtk.TextBuffer, implantID string) error {
+	fmt.Println("implantcmd")
 	endpoint := "/operator"
 	server := Common.ServerURL + endpoint
 	client := &http.Client{}
@@ -219,7 +242,7 @@ func ImplantCommand(cmdGroup, cmdString string, responseChan chan<- string, buff
 	} else {
 		output := "Task sent to implant\n"
 		warn := false
-		Common.HandleAlerts(output, buffer, warn)
+		Common.ConsoleAlerts(output, buffer, warn)
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -236,7 +259,7 @@ func ImplantCommand(cmdGroup, cmdString string, responseChan chan<- string, buff
 			return fmt.Errorf("error reading response body: %w", err)
 		}
 		responseBody = string(responseBytes) // Convert []byte to string
-	// Extract and decode data value
+
 		dataIndex := strings.Index(responseBody, "Data:")
 		if dataIndex != -1 {
 			data := strings.TrimSpace(responseBody[dataIndex+len("Data:"):])
@@ -247,17 +270,17 @@ func ImplantCommand(cmdGroup, cmdString string, responseChan chan<- string, buff
 		} else {
 			output := "No data found in the response\n"
 			warn := true
-			Common.HandleAlerts(output, buffer, warn)
+			Common.ConsoleAlerts(output, buffer, warn)
 		}
 		if len(responseBody) > 0 {
 			output := "Received ouput\n"
 			warn := false
-			Common.HandleAlerts(output, buffer, warn)
+			Common.ConsoleAlerts(output, buffer, warn)
+			fmt.Println("output", responseBody) // Data: +base64
 			break
 		}
-		time.Sleep(100 * time.Millisecond) // Wait for a short duration before trying again
+		time.Sleep(100 * time.Millisecond)
 	}
-
 
 	// Unmarshal JSON
 	var respstruct Command
@@ -270,7 +293,10 @@ func ImplantCommand(cmdGroup, cmdString string, responseChan chan<- string, buff
 	return fmt.Errorf("Failed to unmarshal JSON: %s", err)
 	}
 
-	responseChan <- respstruct.Response
+	fmt.Println("Response", respstruct.Response)
+
+	Common.CommandOutput(respstruct.Response, buffer)
+	Common.CommandChan <- respstruct.Response // Common.CommandChan
 	defer resp.Body.Close()
 	return nil
 }

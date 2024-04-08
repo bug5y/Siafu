@@ -1,7 +1,7 @@
 package main
 import (
     "Team-Server/UI"
-    "Team-Server/DB"
+
     "Team-Server/Server"
 )
 
@@ -13,8 +13,6 @@ var cmdString string
 func main() {
 
     UI.InitUI()
-
-    DB.InitDB()
 
     go Server.OperatorServer()
 

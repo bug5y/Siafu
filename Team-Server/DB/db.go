@@ -1,161 +1,170 @@
 package DB 
 
 import (
-    //"fmt"
-	"log"
-	"strings"
+    "sync"
+    "fmt"
+    "net"
+    "strings"
+    "strconv"
 	"time"
-	"database/sql"
-    "os"
-    "path/filepath"
-    "encoding/base64"
     "crypto/sha256"
     "encoding/hex"
-	//"Team-Server/UI"
-	//"Team-Server/Server"
-	_ "github.com/mattn/go-sqlite3"
 )
-//var mutex sync.RWMutex
+var ConnectionMutex sync.Mutex
 var DbDir string
 var DbPath string
 
 type Connections map[string]ConnectionDetails
 
-type ConnectionDetails struct {
+type ConnectionDetails struct { 
+    // randstr
 	HostVersion string `json:"HostVersion"`
+	HostName    string `json:"HostName"`
+    User        string `json:"User"`
 	AgentType   string `json:"AgentType"`
 	ImplantID   string `json:"ImplantID"`
+
 	InternalIP  string `json:"InternalIP"`
 	ExternalIP  string `json:"ExternalIP"`
-	User        string `json:"User"`
-	HostName    string `json:"HostName"`
+
 	LastSeen    string `json:"LastSeen"`
 	FullHash    string `json:"FullHash"`
-	OrgUID      string `json:"OrgUID"`
 }
 
 var ConnectionLog = Connections{}
 var green = "#7CFC00"
 
-func InitDB() {
-	db, err := buildDB()
-    if err != nil {
-        log.Fatal(err)
+func UpdateLastSeen(key string) {
+    fmt.Println("updatelastseen")
+    ConnectionMutex.Lock()
+    defer ConnectionMutex.Unlock()
+
+    // search by key then update LastSeen
+    if implant, ok := ConnectionLog[key]; ok {
+        currentTime := time.Now()
+        timeString := currentTime.Format("2006-01-02 15:04:05")
+        implant.LastSeen = timeString
+        ConnectionLog[key] = implant
     }
-    defer db.Close()
 }
 
-func buildDB() (*sql.DB, error) {
-    // Get the current working directory
-    wd, err := os.Getwd()
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Create the database directory if it doesn't exist
-    dbDir := filepath.Join(wd, "DB")
-    if _, err := os.Stat(dbDir); os.IsNotExist(err) {
-        err := os.MkdirAll(dbDir, 0755)
-        if err != nil {
-            log.Fatal(err)
-        }
-    }
-
-    // Open SQLite database file
-    DbPath = filepath.Join(DbDir, "siafu.db")
-    db, err := sql.Open("sqlite3", DbPath)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer db.Close()
-
-    // Create table if it does not exist
-    _, err = db.Exec(`CREATE TABLE IF NOT EXISTS implants (
-        uid TEXT PRIMARY KEY,
-        versionName TEXT,
-        IDMask TEXT
-    )`)
-    if err != nil {
-    log.Fatal(err)
-    }
-
-    return db, nil
-}
-    //IPs := strings.Split(string(parts[4]), ",")
-func ParseUID(encodedUID string, protocol string) (ConnectionDetails, string, error) {
-    uid, _ := base64.StdEncoding.DecodeString(encodedUID)
-    parts := strings.Split(string(uid), "-")
+func ParseUID(parts []string, protocol string, uid string, base64UID string) (ConnectionDetails, string, error) {
+    ConnectionMutex.Lock()
+    defer ConnectionMutex.Unlock()
 
     currentTime := time.Now()
     timeString := currentTime.Format("2006-01-02 15:04:05")
 
     hash := sha256.New()
-    hash.Write([]byte(string(uid)))
+    hash.Write([]byte(string(base64UID)))
     hashSum := hash.Sum(nil)
     hexString := hex.EncodeToString(hashSum)
     truncatedHash := hexString[:8]
 
+    VerStr := getVersionString(parts[3])
+
+    ExternalIPs, InternalIPs := sortIPs(parts[4])
+
+    fmt.Println("External IPs:", ExternalIPs)
+    fmt.Println("Internal IPs:", InternalIPs)
+
     uidParts := ConnectionDetails{
-        HostVersion: parts[3],
+        HostVersion: VerStr,
         AgentType:   protocol,
         ImplantID:   truncatedHash,
-        InternalIP:  parts[4], // Assuming first IP is Internal
-        ExternalIP:  parts[4], // Assuming first IP is External
+        InternalIP:  InternalIPs, 
+        ExternalIP:  ExternalIPs, 
         User:        parts[2],
         HostName:    parts[1],
         LastSeen:    timeString,
         FullHash:    hexString,
-        OrgUID:      encodedUID,
     }
 
 	if ConnectionLog == nil {
 		ConnectionLog = make(Connections)
 	}
-    //mutex.Lock()
-	//defer mutex.Unlock()
-    ConnectionLog[hexString] = uidParts
+
+    ConnectionLog[truncatedHash] = uidParts
 
     return uidParts, hexString, nil
 }
 
-func IsUIDInDB(FullHash, versionName string) (error) {
-    var truncatedHash string    // Open database connection
-    db, err := sql.Open("sqlite3", DbPath)
+func getVersionString(versionStr string) string {
+    version, err := strconv.ParseUint(versionStr[2:], 16, 32) // Remove "0x" prefix
     if err != nil {
-        return err
+        return "Invalid version string"
     }
-    defer db.Close()
-
-    // Query the database to check if UID exists
-    err = db.QueryRow("SELECT IDMask FROM implants WHERE uid = ? AND versionName = ?", FullHash, versionName).Scan(&truncatedHash)
-    switch {
-    case err == sql.ErrNoRows:
-        // UID not found, add it to the database
-        err := addToDB(FullHash, versionName, truncatedHash)
-        if err != nil {
-            return err
+    var ver = "Unknown"
+    switch uint32(version) {
+        case 0x2A01:
+            ver = "Windows Server 2022"
+        case 0x2A02:
+            ver = "Windows Server 2019"
+        case 0x2A03:
+            ver = "Windows Server 2016"
+        case 0x2603:
+            ver = "Windows Server 2012 R2"
+        case 0x2602:
+            ver = "Windows Server 2012"
+        case 0x2601:
+            ver = "Windows Server 2008 R2"
+        case 0x2600:
+            ver = "Windows Server 2008"
+        case 0x2502:
+            ver = "Windows Server 2003 R2"
+        case 0x1B00:
+            ver = "Windows 11"
+        case 0x1A00:
+            ver = "Windows 10"
+        case 0x1603:
+            ver = "Windows 8.1"
+        case 0x1602:
+            ver = "Windows 8"
+        case 0x1601:
+            ver = "Windows 7"
+        case 0x1600:
+            ver = "Windows Vista"
+        case 0x1502:
+            ver = "Windows XP Professional x64 Edition"
+        case 0x1501:
+            ver = "Windows XP"
+        case 0x1500:
+            ver = "Windows 2000"            
         }
-        return nil
-    case err != nil:
-        return err // error occurred
-    default:
-        return nil // UID found
-    }
+    return ver
 }
 
-func addToDB(FullHash, versionName, truncatedHash string) (error) {
-    // Open database connection
-    db, err := sql.Open("sqlite3", DbPath)
-    if err != nil {
-        return err
-    }
-    defer db.Close()
+func sortIPs(ipsStr string) (string, string) {
+    IPs := strings.Split(ipsStr, ",")
 
-    // Insert values into database
-    _, err = db.Exec("INSERT INTO implants (uid, versionName, IDMask) VALUES (?, ?, ?)", FullHash, versionName, truncatedHash)
-    if err != nil {
-        return err
+    InternalRanges := []string{"0.0.0.0/8", "169.254.0.0/16", "127.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "172.16.0.0/12", "192.0.0.0/24", "198.18.0.0/15", "192.168.0.0/16"}
+    var InternalIPs, ExternalIPs []string
+
+    for _, ip := range IPs {
+        ip = strings.TrimSpace(ip)
+        // Check if the IP address is within any of the internal ranges
+        isInternal := false
+        for _, internalRange := range InternalRanges {
+            if isIPInRange(ip, internalRange) {
+                InternalIPs = append(InternalIPs, ip)
+                isInternal = true
+                break
+            }
+        }
+        if !isInternal {
+            ExternalIPs = append(ExternalIPs, ip)
+        }
     }
-    return err
+
+    return strings.Join(ExternalIPs, ", "), strings.Join(InternalIPs, ", ")
 }
 
+func isIPInRange(ip, cidr string) bool {
+    _, ipNet, err := net.ParseCIDR(cidr)
+    if err != nil {
+        return false
+    }
+
+    ipAddr := net.ParseIP(ip)
+    return ipNet.Contains(ipAddr)
+}

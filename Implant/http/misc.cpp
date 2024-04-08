@@ -11,8 +11,10 @@
 #include <securitybaseapi.h>
 #include <random>
 #include "base64.hpp"
+#include <picosha2.h>
 #include <codecvt>
 #include <locale>
+#include <iomanip>
 #pragma comment(lib, "Advapi32.lib")
 #pragma comment(lib, "Kernel32.lib")
 #pragma comment(lib, "iphlpapi.lib")
@@ -28,82 +30,79 @@ struct OSINFO {
 };
 
 std::string uid;
-
+std::string truncatedHash;
 DWORD ver;
 DWORD version;
 
-DWORD _getVersion(void)
+DWORD GetWindowsVersion()
 {
-  OSVERSIONINFOEXW osvi;
-  osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
+    OSVERSIONINFOEX osvi;
+    DWORD_PTR dwlConditionMask = 0;
+    BYTE op = VER_GREATER_EQUAL;
 
-    if (GetVersionExW((OSVERSIONINFOW *)&osvi) != FALSE && osvi.dwPlatformId == VER_PLATFORM_WIN32_NT)
+    ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
+    osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+    osvi.dwMajorVersion = 5;
+
+    VER_SET_CONDITION(dwlConditionMask, VER_MAJORVERSION, op);
+
+    DWORD dwlTypeBitsMask = VER_NT_WORKSTATION;
+    BOOL bIsWindowsClient = VerifyVersionInfo(&osvi, VER_MAJORVERSION, dwlConditionMask);
+
+    if (bIsWindowsClient)
     {
-        if (osvi.wProductType == VER_NT_WORKSTATION)
-        {
-            // Windows 2000 - 5.0
-            if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 0) ver = 0x0500;
-            // Windows XP -  5.1
-            else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1) ver = 0x0501;
-            // Windows XP Professional x64 Edition - 5.2
-            else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 2) ver = 0x0502;
-            // Windows Vista - 6.0
-            else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 0) ver = 0x0600;
-            // Windows 7 - 6.1
-            else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1) ver = 0x0601;
-            // Windows 8 - 6.2
-            else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 2) ver = 0x0602;
-            // Windows 8.1 - 6.3
-            else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 3) ver = 0x0603;
-            // Windows 10 - 10.0
-            else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0) ver = 0x0A00;
-            // Windows 11 - 11.0
-            else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= 22000) ver = 0x0B00;
-        }
-        else if (osvi.wProductType == VER_NT_DOMAIN_CONTROLLER || osvi.wProductType == VER_NT_SERVER)
-        {
-            // Windows Server 2003 - 5.2, Windows Server 2003 R2 - 5.2, Windows Home Server - 5.2
-            if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 2) ver = 0x0502;
-            // Windows Server 2008 - 6.0
-            else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 0) ver = 0x0600;
-            // Windows Server 2008 R2 - 6.1
-            else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1) ver = 0x0601;
-            // Windows Server 2012 - 6.2
-            else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 2) ver = 0x0602;
-            // Windows Server 2012 R2 - 6.3
-            else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 3) ver = 0x0603;
-            // Windows Server 2016 - 10.0
-            else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0) ver = 0x0A00;
-            // Windows Server 2019 - 10.0
-            else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= 17763) ver = 0x0A00;
-        }
+        if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= 22000)
+            return 0x1B00; // Windows 11
+        else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0)
+            return 0x1A00; // Windows 10
+        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 3)
+            return 0x1603; // Windows 8.1
+        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 2)
+            return 0x1602; // Windows 8
+        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1)
+            return 0x1601; // Windows 7
+        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 0)
+            return 0x1600; // Windows Vista
+        else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 2)
+            return 0x1502; // Windows XP Professional x64 Edition
+        else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1)
+            return 0x1501; // Windows XP
+        else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 0)
+            return 0x1500; // Windows 2000
     }
-    return ver;
+    else
+    {
+        dwlTypeBitsMask = VER_NT_SERVER;
+        if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= 20348)
+            return 0x2A01; // Windows Server 2022
+        else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= 17763)
+            return 0x2A02; // Windows Server 2019
+        else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= 14393)
+            return 0x2A03; // Windows Server 2016
+        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 3)
+            return 0x2603; // Windows Server 2012 R2
+        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 2)
+            return 0x2602; // Windows Server 2012
+        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1)
+            return 0x2601; // Windows Server 2008 R2
+        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 0)
+            return 0x2600; // Windows Server 2008
+        else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 2)
+            return 0x2502; // Windows Server 2003 R2
+    }
+
+    return 0; // Unknown version
 }
 
-void _getVersionEx(OSINFO *oi)
-{
-    memset(oi, 0, sizeof(OSINFO));
+std::string truncatedSHA256(const std::string& uid) {
+    std::vector<unsigned char> hash(picosha2::k_digest_size);
+    picosha2::hash256(uid.begin(), uid.end(), hash.begin(), hash.end());
 
-    OSVERSIONINFOEXW osvi;
-    osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
+    std::string hex_str = picosha2::bytes_to_hex_string(hash.begin(), hash.end());
+    std::string trunc_str = hex_str.substr(0, 8);
 
-    if (GetVersionExW((OSVERSIONINFOW *)&osvi) != FALSE)
-    {
-        SYSTEM_INFO si;
-        GetNativeSystemInfo(&si);
-
-        oi->version = _getVersion();
-        oi->sp = (osvi.wServicePackMajor > 0xFF || osvi.wServicePackMinor != 0) ? 0 : LOBYTE(osvi.wServicePackMajor);
-        oi->build = osvi.dwBuildNumber > 0xFFFF ? 0 : LOWORD(osvi.dwBuildNumber);
-        oi->architecture = si.wProcessorArchitecture;
-    }
-}
-
-std::vector<std::string> getIPs() {
-    std::vector<std::string> machineIPs;
-    // Implementation to get all ips
-    return machineIPs;
+    misc::truncatedHash = macaron::Base64::Encode(trunc_str);
+    return misc::truncatedHash;
 }
 
 std::string getHostname() {
@@ -200,9 +199,9 @@ std::vector<std::string> getIP() {
             while (pUnicast) {
                 sockaddr *sa = pUnicast->Address.lpSockaddr;
                 if (sa->sa_family == AF_INET) {
-                    sockaddr_in *sin = reinterpret_cast<sockaddr_in*>(sa);
+                    const sockaddr_in* sin = reinterpret_cast<const sockaddr_in*>(sa);
                     char buffer[INET_ADDRSTRLEN];
-                    inet_ntop(AF_INET, &(sin->sin_addr), buffer, INET_ADDRSTRLEN);
+                    strcpy_s(buffer, INET_ADDRSTRLEN, inet_ntoa(sin->sin_addr));
                     addresses.push_back(buffer);
                 }
                 pUnicast = pUnicast->Next;
@@ -243,13 +242,16 @@ std::string buildUID() {
     ULONG ulFamily = AF_UNSPEC;
     unsigned char* pszAddress = nullptr;
 
-    _getVersionEx(&osInfo);
-    _getVersion();
+    DWORD verdw;
+
+    verdw = GetWindowsVersion();
+
+    std::cout << "Version " << verdw << std::endl; // shows its 0
 
     std::string hostname = getHostname();
     std::string execUsername = getUsername();
     std::string randomString = generateRandomString(4);
-    std::string concatString = randomString + "-" + hostname + "-" + execUsername + "-" +std::to_string(ver) + "-";
+    std::string concatString = randomString + "-" + hostname + "-" + execUsername + "-" +std::to_string(verdw) + "-";
     std::vector<std::string> ipAddresses = getIP();
         for (const auto& address : ipAddresses) {
             concatString += "," + address;
@@ -257,6 +259,7 @@ std::string buildUID() {
 
     std::string base64Concat = macaron::Base64::Encode(concatString);
     misc::uid = base64Concat;
+    misc::truncatedHash = truncatedSHA256(uid);
     return misc::uid;
 }
 

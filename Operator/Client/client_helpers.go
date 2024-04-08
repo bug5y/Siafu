@@ -8,6 +8,7 @@ import (
 )
 
 func getIP() (string, error) {
+    fmt.Println("getip")
     addrs, err := net.InterfaceAddrs()
     if err != nil {
         return "", fmt.Errorf("failed to retrieve interface addresses: %v", err)
@@ -27,6 +28,7 @@ func getIP() (string, error) {
 }
 
 func verifyServerUp(serverURL string) bool {
+    fmt.Println("serverup")
     resp, err := http.Get(serverURL)
     if err != nil {
         return false
