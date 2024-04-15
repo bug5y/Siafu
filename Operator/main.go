@@ -1,22 +1,15 @@
-
 package main
 
 import (
-    "Operator/UI"
-    "Operator/Client"
-    "fmt"
+	_Client "Operator/Client"
+	_Common "Operator/Common"
+	_UI "Operator/UI"
 )
 
 func main() {
-
-    fmt.Println("main")
-    UI.InitUI()
-
-    Client.ServerConnection()
-
-    go Client.UpdateLog()
-
-    go UI.Connections()
-
-    UI.BuildUI()
+	_UI.InitUI()
+	_Client.ServerConnection()
+	_Common.GoRoutine(_UI.StartUIConnections)
+	_Common.GoRoutine(_Client.UpdateLog)
+	_UI.BuildUI()
 }

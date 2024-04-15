@@ -30,7 +30,7 @@ def main():
     siafu_base = get_base_folder()
 
     folder_name = "Builder-Output"
-    output_folder = os.path.join(siafu_base, "Operator", folder_name)
+    output_folder = os.path.join(siafu_base, folder_name)
     
     if not os.path.exists(output_folder):
         try:

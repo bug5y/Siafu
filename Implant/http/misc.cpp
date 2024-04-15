@@ -21,78 +21,58 @@
 #pragma comment(lib, "ws2_32.lib")
 
 namespace misc {
-// Define OSINFO structure
-struct OSINFO {
-    DWORD version;
-    DWORD sp;
-    DWORD build;
-    WORD architecture;
-};
-
 std::string uid;
 std::string truncatedHash;
-DWORD ver;
-DWORD version;
 
-DWORD GetWindowsVersion()
+std::string GetWindowsVersion()
 {
-    OSVERSIONINFOEX osvi;
-    DWORD_PTR dwlConditionMask = 0;
-    BYTE op = VER_GREATER_EQUAL;
-
-    ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
-    osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
-    osvi.dwMajorVersion = 5;
-
-    VER_SET_CONDITION(dwlConditionMask, VER_MAJORVERSION, op);
-
-    DWORD dwlTypeBitsMask = VER_NT_WORKSTATION;
-    BOOL bIsWindowsClient = VerifyVersionInfo(&osvi, VER_MAJORVERSION, dwlConditionMask);
-
-    if (bIsWindowsClient)
+    HMODULE hMod = LoadLibraryExW(L"winbrand.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if(hMod)
     {
-        if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= 22000)
-            return 0x1B00; // Windows 11
-        else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0)
-            return 0x1A00; // Windows 10
-        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 3)
-            return 0x1603; // Windows 8.1
-        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 2)
-            return 0x1602; // Windows 8
-        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1)
-            return 0x1601; // Windows 7
-        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 0)
-            return 0x1600; // Windows Vista
-        else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 2)
-            return 0x1502; // Windows XP Professional x64 Edition
-        else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 1)
-            return 0x1501; // Windows XP
-        else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 0)
-            return 0x1500; // Windows 2000
+        PWSTR (WINAPI* pfnBrandingFormatString)(PCWSTR pstrFormat);
+        (FARPROC&)pfnBrandingFormatString = 
+            GetProcAddress(hMod, "BrandingFormatString");
+        if(pfnBrandingFormatString) {
+            PWSTR pstrOSName = pfnBrandingFormatString(L"%WINDOWS_LONG%");
+            std::wstring osNameW(pstrOSName);
+            GlobalFree((HGLOBAL)pstrOSName);
+            
+            std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+            std::string osName = converter.to_bytes(osNameW);
+            
+            return osName;
+        } else {
+            assert(false);
+        }
+        FreeLibrary(hMod);
+    } else {
+        assert(false);
     }
-    else
-    {
-        dwlTypeBitsMask = VER_NT_SERVER;
-        if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= 20348)
-            return 0x2A01; // Windows Server 2022
-        else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= 17763)
-            return 0x2A02; // Windows Server 2019
-        else if (osvi.dwMajorVersion == 10 && osvi.dwMinorVersion == 0 && osvi.dwBuildNumber >= 14393)
-            return 0x2A03; // Windows Server 2016
-        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 3)
-            return 0x2603; // Windows Server 2012 R2
-        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 2)
-            return 0x2602; // Windows Server 2012
-        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 1)
-            return 0x2601; // Windows Server 2008 R2
-        else if (osvi.dwMajorVersion == 6 && osvi.dwMinorVersion == 0)
-            return 0x2600; // Windows Server 2008
-        else if (osvi.dwMajorVersion == 5 && osvi.dwMinorVersion == 2)
-            return 0x2502; // Windows Server 2003 R2
-    }
-
-    return 0; // Unknown version
+    return "";
 }
+/*
+ULONG MajorVersion = 0;
+ULONG MinorVersion = 0;
+ULONG BuildNumber = 0;
+
+void (WINAPI *pfnRtlGetNtVersionNumbers)(
+	__out_opt ULONG* pNtMajorVersion,
+	__out_opt ULONG* pNtMinorVersion,
+	__out_opt ULONG* pNtBuildNumber
+);
+
+(FARPROC&)pfnRtlGetNtVersionNumbers = 
+	GetProcAddress(GetModuleHandle(L"ntdll.dll"), "RtlGetNtVersionNumbers");
+
+if(pfnRtlGetNtVersionNumbers)
+{
+	pfnRtlGetNtVersionNumbers(&MajorVersion, &MinorVersion, &BuildNumber);
+}
+else
+{
+	assert(false);
+}
+*/
 
 std::string truncatedSHA256(const std::string& uid) {
     std::vector<unsigned char> hash(picosha2::k_digest_size);
@@ -237,21 +217,15 @@ std::string generateRandomString(int length) {
 }
 
 std::string buildUID() {
-    OSINFO osInfo;
     ULONG ulFlags = GAA_FLAG_INCLUDE_PREFIX;
     ULONG ulFamily = AF_UNSPEC;
     unsigned char* pszAddress = nullptr;
 
-    DWORD verdw;
-
-    verdw = GetWindowsVersion();
-
-    std::cout << "Version " << verdw << std::endl; // shows its 0
-
+    std::string osName = GetWindowsVersion();
     std::string hostname = getHostname();
     std::string execUsername = getUsername();
     std::string randomString = generateRandomString(4);
-    std::string concatString = randomString + "-" + hostname + "-" + execUsername + "-" +std::to_string(verdw) + "-";
+    std::string concatString = randomString + "-" + hostname + "-" + execUsername + "-" + osName + "-";
     std::vector<std::string> ipAddresses = getIP();
         for (const auto& address : ipAddresses) {
             concatString += "," + address;

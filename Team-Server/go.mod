@@ -1,6 +1,6 @@
 module Team-Server
 
-go 1.21.6
+go 1.19
 
 require (
 	github.com/fstanis/screenresolution v0.0.0-20190527020317-869904d15333

@@ -7,9 +7,7 @@ import (
 	"time"
     "sync"
     "log"
-    "fmt"
 )
-
 
 var logBuffer *gtk.TextBuffer
 var mRefProvider *gtk.CssProvider
@@ -21,8 +19,8 @@ var logMutex sync.Mutex
 var bufferMu sync.Mutex 
 
 const (
-    lightBlue = "#90afc5" /* selected items & other interactive components */
-    brightBlue = "#1e90ff" /* use for notifications */
+    lightBlue = "#90afc5"
+    brightBlue = "#1e90ff" /* use for non-error notifications */
     brightRed = "#e14e19" /* use for error notifications */
     allWhite = "#ffffff" /* text */
 	Reset = "#000000"
@@ -34,25 +32,23 @@ var indicator = "<span>[" + "<span foreground=\"" + lightBlue + "\">+</span>" + 
 func InitUI() {
     gtk.Init(nil)
     
+    settings, _ := gtk.SettingsGetDefault()
+    settings.SetProperty("gtk-theme-name", "Adwaita-dark")
+    
     win, _ = gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
     win.SetTitle("Siafu Team Server")
     win.Connect("destroy", func() {
         gtk.MainQuit()
     })
 
-    // Load CSS stylesheet
     mRefProvider, _  = gtk.CssProviderNew()
     mRefProvider.LoadFromPath("./UI/Material-DeepOcean/gtk-dark.css")
  
     // Apply to whole app
     screen, _ = gdk.ScreenGetDefault()
     gtk.AddProviderForScreen(screen, mRefProvider, gtk.STYLE_PROVIDER_PRIORITY_USER)
-    
-    // Create a Box for organizing widgets
 	box, _ := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
-
     menubar, _ := gtk.MenuBarNew()
-	// Create menu
 	fileMenu := createFileMenu()
     menubar.Append(fileMenu)
 
@@ -63,21 +59,17 @@ func InitUI() {
 		log.Fatal("Unable to create notebook:", err)
 	}
 
-	// Create a box for holding the text view
 	textBox, _ := gtk.BoxNew(gtk.ORIENTATION_HORIZONTAL, 0)
 	textBox.SetHExpand(true)
 	textBox.SetVExpand(true)
 
-	// Create a scrolled window
 	scrolledWin, _ := gtk.ScrolledWindowNew(nil, nil)
 	scrolledWin.SetPolicy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
 
-	// Create a text view
 	servertxt, _ := gtk.TextViewNew()
 	servertxt.SetEditable(false)
 	scrolledWin.Add(servertxt)
 
-	// Add scrolled window to the box
 	textBox.PackStart(scrolledWin, true, true, 0)
 
 	page, err := gtk.BoxNew(gtk.ORIENTATION_VERTICAL, 0)
@@ -108,16 +100,12 @@ func InitUI() {
         ScreenWidth = int(float64(resolution.Width) * 0.5)
         ScreenHeight = int(float64(resolution.Height) * 0.5)
     }
-
     logBuffer, _ = servertxt.GetBuffer()
 }
 
 func BuildUI() {
-
 	win.SetDefaultSize(ScreenWidth, ScreenHeight)
     win.ShowAll()
-
-    // Start the GTK main event loop
     gtk.Main()
 }
 
@@ -131,7 +119,6 @@ func createFileMenu() *gtk.MenuItem {
         gtk.MainQuit()
     })
 
-    //submenu.Append(newTabItem)
     submenu.Append(quitItem)
     menu.SetSubmenu(submenu)
 
@@ -140,19 +127,16 @@ func createFileMenu() *gtk.MenuItem {
 
 
 func InsertLogMarkup(Text string) { // Inserts to log
-    fmt.Println("insertlogmarkup")
     logMutex.Lock()
-    defer logMutex.Unlock()
-
     bufferMu.Lock()
-    defer bufferMu.Unlock()
-
-    iter := logBuffer.GetEndIter()
     
+    iter := logBuffer.GetEndIter()
     currentTime := time.Now()
     formattedTime := "<span foreground=\"" + lightBlue + "\">" + "  " + currentTime.Format("2006-01-02 15:04:05") + "</span>"
-
     markup := formattedTime + " " + indicator + " " + Text + "\n"
     logBuffer.InsertMarkup(iter, markup)
+
+    bufferMu.Unlock()
+    logMutex.Unlock()
 
 }

@@ -1,32 +1,22 @@
-package UI
+package _UI
 
 import (
-	"fmt"
-    "github.com/gotk3/gotk3/gtk"
-    //"Operator/Common"
+	"github.com/gotk3/gotk3/gtk"
 )
 
 func initPlaceHolder(entry *gtk.Entry) {
-    fmt.Println("initplaceholder")
-    entry.SetPlaceholderText(PlaceHolder)
+	entry.SetPlaceholderText(PlaceHolder)
 }
 
 func showErrorDialog(parent *gtk.Dialog, message string) {
-    fmt.Println("showerror")
-    dialog := gtk.MessageDialogNew(parent, gtk.DIALOG_MODAL, gtk.MESSAGE_ERROR, gtk.BUTTONS_OK, message)
-    dialog.SetTitle("Error")
-    dialog.Run()
-    dialog.Destroy()
+	dialog := gtk.MessageDialogNew(parent, gtk.DIALOG_MODAL, gtk.MESSAGE_ERROR, gtk.BUTTONS_OK, message)
+	dialog.SetTitle("Error")
+	dialog.Run()
+	dialog.Destroy()
 }
 
 func createEntry() *gtk.Entry {
-    fmt.Println("createentry")
-    entry, _ := gtk.EntryNew()
-    entryCount = entryCount + 1
-    return entry
+	entry, _ := gtk.EntryNew()
+	entryCount = entryCount + 1
+	return entry
 }
-
-
-
-
-
