@@ -2,29 +2,43 @@
 
 Siafu is a C2 written in Go and C++ consisting of three main components:
 
-1. **Operator** (Go): A graphical user interface (GUI) to send and receive data from the client/implant. Designed to be ran on Linux.
-2. **Team-Server** (Go): A command and control (C2) server that facilitates communication between the Operator and the remote clients/implants. Designed to be ran on Linux.
-3. **Client/Implant** (C++): Client application that runs on remote systems and receives instructions from the C2 server. Currently only supports Windows.
+1. **Operator** (Go): 
+    - A graphical user interface to send and receive data from the client/implant.
+    - Payload generation
+    - Listener creation
+    <br>
 
-## Features
+![Screenshot of the Operator interface](/assets/images/Operator.png)<br>
 
-- Coming soon
+2. **Team-Server** (Go): 
+    - A command and control server thats designed to support multiple operators and implants.<br>
 
-## Getting Started
+![Screenshot of the Team-Server interface](/assets/images/team-server.png)<br>
 
-### Prerequisites
+3. **Client/Implant** (C++): 
+    - Client application.
+    - Supports Windows OS.<br>
 
-- Coming soon
+## Install
+A build script is provided for installing Siafu and its dependencies:<br>
+<sub> Build script has only been tested on Ubuntu & Kali. Elevated privileges are required to perform "apt" updates and installs. </sub><br>
 
-### Building
+```
+git clone https://github.com/BUG5Y/Siafu.git
+cd Siafu
+sudo build.sh
+```
 
-- Coming soon
+## Usage
+Operator
+```
+cd /Siafu/Operator
+./Operator
+```
 
-### Usage
-
-- Coming soon
-
-### To-Do
-- Fix memory based crashes on server and operator
-- Sort IPs into external and internal IPs
-- Sort out uid issues
+Team-Server<br>
+<sub> Elevated privileges are required to use privileged ports</sub>
+```
+cd /Siafu/Team-Server
+sudo ./Team-Server
+```

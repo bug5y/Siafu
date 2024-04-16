@@ -124,7 +124,7 @@ func init() {
 	Shared.Tabs = make(map[int]*Tabs)
 	Shared.LM = make(map[*gtk.Label]int)
 	Shared.CL = make(Connections)
-	Shared.Protos = []string{"http", "https"}
+	Shared.Protos = []string{"http"} //, "https"
 	Shared.Indicator = "<span>[" + "<span foreground=\"" + LightBlue + "\">+</span>" + "]</span>"
 
 }
