@@ -42,6 +42,8 @@ func InitUI() {
     })
 
     mRefProvider, _  = gtk.CssProviderNew()
+    //cssPath := SiafuBase + "/UI/Material-DeepOcean/gtk-dark.css"
+    //fmt.Println(cssPath)
     mRefProvider.LoadFromPath("./UI/Material-DeepOcean/gtk-dark.css")
  
     // Apply to whole app

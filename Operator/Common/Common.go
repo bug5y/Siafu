@@ -245,7 +245,6 @@ func InsertLogMarkup(Text string) { // Inserts to activity log
 }
 
 func ConsoleAlerts(output string, warn bool) { // Inserts to CMD console
-	fmt.Println("consolealert")
 	ct := GetCurrentTab()
 	Shared.CT.CtMutex.Lock()
 	if ct.CurrentBuffer == nil {
@@ -360,7 +359,7 @@ func updateConnectionLog(Text string) {
 			text := "New connection" + " " + key
 			InsertLogMarkup(text)
 			ConnectionLog[key] = connectionDetails
-			data := []string{connectionDetails.HostVersion, connectionDetails.AgentType, connectionDetails.ImplantID, connectionDetails.HostName, connectionDetails.User, connectionDetails.LastSeen, connectionDetails.InternalIP, connectionDetails.ExternalIP}
+			data := []string{connectionDetails.HostVersion, connectionDetails.HostName, connectionDetails.User, connectionDetails.LastSeen, connectionDetails.ImplantID, connectionDetails.InternalIP, connectionDetails.ExternalIP, connectionDetails.AgentType}
 			CreateRow(data)
 		}
 	}

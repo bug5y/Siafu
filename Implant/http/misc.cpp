@@ -86,12 +86,25 @@ std::string truncatedSHA256(const std::string& uid) {
 }
 
 std::string getHostname() {
-    char hostname[MAX_COMPUTERNAME_LENGTH + 1];
-    DWORD hostnameSize = sizeof(hostname);
-    if (GetComputerNameExA(ComputerNameDnsFullyQualified, hostname, &hostnameSize) != 0) {
-        return std::string(hostname);
+    std::string hostname;
+
+    // fully qualified domain name
+    char buffer[MAX_COMPUTERNAME_LENGTH + 1];
+    DWORD bufferSize = sizeof(buffer);
+    if (GetComputerNameExA(ComputerNameDnsFullyQualified, buffer, &bufferSize) != 0) {
+        hostname = buffer;
     }
-    return std::string();
+    else {
+        // computer name
+        bufferSize = sizeof(buffer);
+        if (GetComputerNameA(buffer, &bufferSize) != 0) {
+            hostname = buffer;
+        }
+        else {
+            return std::string();
+        }
+    }
+    return hostname;
 }
 
 std::string getUsername() {

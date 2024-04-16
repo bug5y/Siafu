@@ -44,8 +44,9 @@ func InitUI() {
 	})
 
 	// Load CSS stylesheet
+	//cssPath := "." + SiafuBase + "/UI/Material-DeepOcean/gtk-dark.css"
 	mRefProvider, _ = gtk.CssProviderNew()
-	mRefProvider.LoadFromPath("./UI/Material-DeepOcean/gtk-dark.css") // ./UI/Material-DeepOcean/gtk-dark.css
+	mRefProvider.LoadFromPath("./UI/Material-DeepOcean/gtk-dark.css")
 
 	// Apply to whole app
 	screen, _ = gdk.ScreenGetDefault()
@@ -161,7 +162,7 @@ func Connections() {
 	})
 
 	notebook.Connect("switch-page", func(notebook *gtk.Notebook, page *gtk.Widget, pageNum int) {
-		tab := _Common.TabMap[pageNum]
+		tab := _Common.Shared.Tabs[pageNum]
 
 		if tab != nil {
 			_Common.SetCurrentTab(&_Common.CurrentTab{
@@ -173,7 +174,7 @@ func Connections() {
 			})
 		}
 		curpg := notebook.GetCurrentPage()
-		for in, tab := range _Common.TabMap {
+		for in, tab := range _Common.Shared.Tabs {
 			if in == curpg {
 				tab.Entry.SetVisible(true)
 			} else {
@@ -185,7 +186,7 @@ func Connections() {
 }
 
 func createTable(infoTable *gtk.TreeView, store *gtk.ListStore, TableWidth int) {
-	columns := []string{"OS", "Agent Type", "UID", "Host Name", "User", "Last Seen", "Internal IP(s)", "External IP(s)"}
+	columns := []string{"OS", "Host Name", "User", "Last Seen", "UID", "Internal IP(s)", "External IP(s)", "Agent Type"}
 
 	infoTable.SetModel(store)
 	columnwidth := TableWidth / len(columns)
@@ -273,7 +274,7 @@ func setupTab(notebook *gtk.Notebook, vbox *gtk.Box, win *gtk.Window, PlaceHolde
 	//bufferIndex = bufferIndex + 1
 	vbox.PackEnd(cmdentry, false, false, 0)
 
-	_Common.TabMap[pageIndex] = &_Common.Tabs{
+	_Common.Shared.Tabs[pageIndex] = &_Common.Tabs{
 		ID:        ID,
 		PageIndex: pageIndex,
 		TabLabel:  tabLabel,
@@ -297,7 +298,7 @@ func setupTab(notebook *gtk.Notebook, vbox *gtk.Box, win *gtk.Window, PlaceHolde
 
 	notebook.ShowAll()
 	newPage := notebook.GetCurrentPage()
-	for in, tab := range _Common.TabMap {
+	for in, tab := range _Common.Shared.Tabs {
 		if in == newPage {
 			tab.Entry.SetVisible(true)
 		} else {
@@ -315,11 +316,10 @@ func removeImplant(tv *gtk.TreeView, store *gtk.ListStore, notebook *gtk.Noteboo
 	selection, _ := tv.GetSelection()
 	_, iter, _ := selection.GetSelected()
 
-	col2Value, _ := store.GetValue(iter, 2) // ID
+	col2Value, _ := store.GetValue(iter, 4) // ID in column 5
 	col2, _ := col2Value.GetString()
 	removeID := col2
 
-	fmt.Println("Remove:", removeID)
 	if iter != nil {
 		store.Remove(iter)
 		removeTab(notebook, paned, vbox, nilButton, removeID)
@@ -352,30 +352,27 @@ func newConsole(notebook *gtk.Notebook, vbox *gtk.Box, win *gtk.Window, PlaceHol
 
 	if iter != nil {
 		// Retrieve data from each column and convert to string
-		col2Value, err := listStore.GetValue(iter, 2) // ID
+		col4Value, err := listStore.GetValue(iter, 4) // ID
 		if err != nil {
-			fmt.Println("Error getting value from column 2:", err)
-			return
-		}
-		col2, _ := col2Value.GetString()
-
-		col4Value, err := listStore.GetValue(iter, 4) // User
-		if err != nil {
-			fmt.Println("Error getting value from column 4:", err)
 			return
 		}
 		col4, _ := col4Value.GetString()
 
-		col3Value, err := listStore.GetValue(iter, 3) // Host
+		col2Value, err := listStore.GetValue(iter, 2) // User
 		if err != nil {
-			fmt.Println("Error getting value from column 3:", err)
 			return
 		}
-		col3, _ := col3Value.GetString()
+		col2, _ := col2Value.GetString()
 
-		tabName := col2 + ": " + col4 + "@" + col3
+		col1Value, err := listStore.GetValue(iter, 1) // Host
+		if err != nil {
+			return
+		}
+		col1, _ := col1Value.GetString()
 
-		ID = col2
+		tabName := col4 + ": " + col2 + "@" + col1
+
+		ID = col4
 
 		setupTab(notebook, vbox, win, PlaceHolder, tabName, paned)
 
@@ -433,26 +430,26 @@ func removeTab(notebook *gtk.Notebook, paned *gtk.Paned, vbox *gtk.Box, button *
 	var e *gtk.Entry
 	if button != nil && removeID == "" {
 		// Get the page index using the button value
-		for pageIndex, tab := range _Common.TabMap {
+		for pageIndex, tab := range _Common.Shared.Tabs {
 			if tab.Button == button {
 				page = pageIndex
 				fmt.Println("From page", pageIndex)
-				e = _Common.TabMap[pageIndex].Entry
+				e = _Common.Shared.Tabs[pageIndex].Entry
 				break
 			}
 		}
 	} else if button == nil && removeID != "" {
-		for pageIndex, tab := range _Common.TabMap {
+		for pageIndex, tab := range _Common.Shared.Tabs {
 			if tab.ID == removeID {
 				page = pageIndex
-				e = _Common.TabMap[pageIndex].Entry
+				e = _Common.Shared.Tabs[pageIndex].Entry
 			}
 		}
 	} else {
 		fmt.Println("Something went wrong")
 	}
 
-	tab, exists := _Common.TabMap[page]
+	tab, exists := _Common.Shared.Tabs[page]
 
 	if !exists {
 		fmt.Println(page, "does not exist")
@@ -462,13 +459,13 @@ func removeTab(notebook *gtk.Notebook, paned *gtk.Paned, vbox *gtk.Box, button *
 	notebook.RemovePage(page)
 
 	if tab != nil {
-		delete(_Common.TabMap, page)
+		delete(_Common.Shared.Tabs, page)
 	} else {
 		fmt.Println("tab does not exist for", page)
 		return
 	}
 
-	for _, info := range _Common.TabMap {
+	for _, info := range _Common.Shared.Tabs {
 		if info.PageIndex > page {
 			// Decrement pageIndex for tabs after the removed page
 			info.PageIndex--
@@ -477,15 +474,15 @@ func removeTab(notebook *gtk.Notebook, paned *gtk.Paned, vbox *gtk.Box, button *
 
 	// Update the keys
 	updateMap := make(map[int]*_Common.Tabs)
-	for _, info := range _Common.TabMap {
+	for _, info := range _Common.Shared.Tabs {
 		updateMap[info.PageIndex] = info
 	}
-	_Common.TabMap = updateMap
+	_Common.Shared.Tabs = updateMap
 
 	vbox.Remove(e)
 
 	newPage := notebook.GetCurrentPage()
-	for in, tab := range _Common.TabMap {
+	for in, tab := range _Common.Shared.Tabs {
 		if in == newPage {
 			tab.Entry.SetVisible(true)
 		} else {
@@ -493,7 +490,7 @@ func removeTab(notebook *gtk.Notebook, paned *gtk.Paned, vbox *gtk.Box, button *
 		}
 	}
 
-	if len(_Common.TabMap) == 0 {
+	if len(_Common.Shared.Tabs) == 0 {
 		paned.Remove(notebook)
 	}
 }
@@ -759,12 +756,13 @@ func startListener(ip string, port string, proto string) {
 }
 
 func builder(ip string, port string, proto string) {
-	cmd := exec.Command("python3", "./Builder/builder.py", ip, port, proto)
+	builderPath := "./Builder/builder.py"
+	cmd := exec.Command("python3", builderPath, ip, port, proto)
 	err := cmd.Run()
 	if err != nil {
 		fmt.Println("Error running build script:", err)
 	} else {
-		Text := "Build completed for" + ip + ":" + port
+		Text := "Build completed for " + ip + ":" + port
 		_Common.InsertLogMarkup(Text)
 	}
 

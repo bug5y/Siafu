@@ -28,7 +28,6 @@ func updateConnections(respChan chan<- string) {
 }
 
 func addToCommandQueue(commands [][]string, idMask string) {
-	fmt.Println("addcmdtoqueue")
 	item := CommandQueueItem{
 		Commands: commands,
 		IDMask:   idMask,
