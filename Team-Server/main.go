@@ -1,7 +1,6 @@
 package main
 import (
     "Team-Server/UI"
-
     "Team-Server/Server"
 )
 

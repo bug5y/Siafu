@@ -44,8 +44,9 @@ func InitUI() {
 	})
 
 	// Load CSS stylesheet
+	//cssPath := "." + SiafuBase + "/UI/Material-DeepOcean/gtk-dark.css"
 	mRefProvider, _ = gtk.CssProviderNew()
-	mRefProvider.LoadFromPath("./UI/Material-DeepOcean/gtk-dark.css") // ./UI/Material-DeepOcean/gtk-dark.css
+	mRefProvider.LoadFromPath("./UI/Material-DeepOcean/gtk-dark.css")
 
 	// Apply to whole app
 	screen, _ = gdk.ScreenGetDefault()
@@ -319,7 +320,6 @@ func removeImplant(tv *gtk.TreeView, store *gtk.ListStore, notebook *gtk.Noteboo
 	col2, _ := col2Value.GetString()
 	removeID := col2
 
-	fmt.Println("Remove:", removeID)
 	if iter != nil {
 		store.Remove(iter)
 		removeTab(notebook, paned, vbox, nilButton, removeID)
@@ -759,7 +759,8 @@ func startListener(ip string, port string, proto string) {
 }
 
 func builder(ip string, port string, proto string) {
-	cmd := exec.Command("python3", "./Builder/builder.py", ip, port, proto)
+	builderPath := "./Builder/builder.py"
+	cmd := exec.Command("python3", builderPath, ip, port, proto)
 	err := cmd.Run()
 	if err != nil {
 		fmt.Println("Error running build script:", err)

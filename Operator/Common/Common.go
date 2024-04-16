@@ -245,7 +245,6 @@ func InsertLogMarkup(Text string) { // Inserts to activity log
 }
 
 func ConsoleAlerts(output string, warn bool) { // Inserts to CMD console
-	fmt.Println("consolealert")
 	ct := GetCurrentTab()
 	Shared.CT.CtMutex.Lock()
 	if ct.CurrentBuffer == nil {
