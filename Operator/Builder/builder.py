@@ -101,7 +101,7 @@ def build(proto, temp_folder_folder, output_folder, include_folder, implant_name
     "-I",
     "/usr/x86_64-w64-mingw32/include",
     "-I",
-    "/home/sev/Desktop/Siafu/Implant/include/zlib",
+    "/Siafu/Implant/include/zlib",
     ] + cpp_files + [
     "-o",
     os.path.join(output_folder, implant_name + ".exe"),
