@@ -1,5 +1,7 @@
+**! Not ready for use ¡**
+** Still a work in progress**
+
 # Siafu
-**work in progress**
 
 Siafu is a C2 written in Go and C++ consisting of three main components:
 
